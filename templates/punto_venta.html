@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Caja Registradora | SistemaSmart{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-7">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Buscador Rápido</h5>
+                <input type="text" id="buscador" class="form-control mb-3" placeholder="Escribe el nombre del producto..." autofocus>
+                
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover align-middle" id="tablaProductos">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th>Stock (Unid.)</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for producto in productos %}
+                            {% if producto.activo %}
+                            <tr>
+                                <td class="fw-bold">{{ producto.nombre }}</td>
+                                <td>{{ producto.stock_actual }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-success w-100 fw-bold btn-pre-agregar" 
+                                            data-id="{{ producto.id_producto }}" 
+                                            data-nombre="{{ producto.nombre }}" 
+                                            data-punidad="{{ producto.precio_unidad }}"
+                                            data-pblister="{{ producto.precio_blister or 0 }}"
+                                            data-pcaja="{{ producto.precio_caja or 0 }}"
+                                            data-ublister="{{ producto.unidades_por_blister }}"
+                                            data-ucaja="{{ producto.unidades_por_caja }}">
+                                        + Agregar
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-body bg-light">
+                <h4 class="card-title mb-4">Ticket de Venta</h4>
+                
+                <ul class="list-group mb-4" id="carrito_compras">
+                    <li class="list-group-item text-center text-muted">Aún no hay productos en la venta</li>
+                </ul>
+
+                <div class="d-flex justify-content-between fs-4 fw-bold text-primary mb-4">
+                    <span>Total:</span>
+                    <span id="total_venta">S/ 0.00</span>
+                </div>
+
+                <button class="btn btn-primary w-100 btn-lg" id="btn_cobrar" disabled>Cobrar Venta</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalOpcionesVenta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalProductoNombre">Producto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formAgregarCarrito">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Venta</label>
+                        <select class="form-select" id="tipo_venta" required>
+                            <option value="unidad">Por Unidad</option>
+                            <option value="blister">Por Blíster</option>
+                            <option value="caja">Por Caja</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" class="form-control" id="cantidad_venta" value="1" min="1" required>
+                    </div>
+                    <p class="text-muted small mb-0">Precio Unitario: <span id="precio_dinamico" class="fw-bold">S/ 0.00</span></p>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-success w-100">Añadir al Ticket</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Memoria del Punto de Venta
+    let carrito = [];
+    let productoActual = {}; // Guardará los datos del producto al que le dimos clic temporalmente
+    
+    // UI Elements
+    const carritoUI = document.getElementById('carrito_compras');
+    const totalUI = document.getElementById('total_venta');
+    const btnCobrar = document.getElementById('btn_cobrar');
+    const buscador = document.getElementById('buscador');
+    
+    // Modal Elements
+    const modalVenta = new bootstrap.Modal(document.getElementById('modalOpcionesVenta'));
+    const formAgregar = document.getElementById('formAgregarCarrito');
+    const selectTipoVenta = document.getElementById('tipo_venta');
+    const labelPrecioDinamico = document.getElementById('precio_dinamico');
+
+    // === BUSCADOR EN TIEMPO REAL ===
+    buscador.addEventListener('keyup', function() {
+        const filtro = this.value.toLowerCase();
+        const filas = document.querySelectorAll('#tablaProductos tbody tr');
+        
+        filas.forEach(fila => {
+            const textoFila = fila.innerText.toLowerCase();
+            // Si el texto de la fila incluye lo que escribimos, la mostramos, sino la ocultamos
+            if(textoFila.includes(filtro)) {
+                fila.style.display = '';
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+    });
+
+    // === AL HACER CLIC EN "+ AGREGAR" ===
+    document.querySelectorAll('.btn-pre-agregar').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Guardamos todos los datos del botón en nuestra variable temporal
+            productoActual = {
+                id: parseInt(this.getAttribute('data-id')),
+                nombre: this.getAttribute('data-nombre'),
+                p_unidad: parseFloat(this.getAttribute('data-punidad')),
+                p_blister: parseFloat(this.getAttribute('data-pblister')),
+                p_caja: parseFloat(this.getAttribute('data-pcaja')),
+                u_blister: parseInt(this.getAttribute('data-ublister')),
+                u_caja: parseInt(this.getAttribute('data-ucaja'))
+            };
+
+            // Preparamos el Modal
+            document.getElementById('modalProductoNombre').innerText = productoActual.nombre;
+            document.getElementById('cantidad_venta').value = 1;
+            selectTipoVenta.value = 'unidad';
+            actualizarPrecioDinamico();
+            
+            // Abrimos el Modal
+            modalVenta.show();
+        });
+    });
+
+    // Actualizar el texto del precio cuando cambiamos de unidad a caja
+    selectTipoVenta.addEventListener('change', actualizarPrecioDinamico);
+    function actualizarPrecioDinamico() {
+        let precio = 0;
+        if(selectTipoVenta.value === 'unidad') precio = productoActual.p_unidad;
+        if(selectTipoVenta.value === 'blister') precio = productoActual.p_blister;
+        if(selectTipoVenta.value === 'caja') precio = productoActual.p_caja;
+        labelPrecioDinamico.innerText = `S/ ${precio.toFixed(2)}`;
+    }
+
+    // === AL CONFIRMAR LA CANTIDAD EN EL MODAL ===
+    formAgregar.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const tipo = selectTipoVenta.value;
+        const cantidadInput = parseInt(document.getElementById('cantidad_venta').value);
+        
+        let precioCobrado = 0;
+        let unidadesRealesARestar = 0;
+        let etiquetaNombre = `${productoActual.nombre} (${tipo})`;
+
+        // Matemáticas lógicas según el tipo
+        if (tipo === 'unidad') {
+            precioCobrado = productoActual.p_unidad;
+            unidadesRealesARestar = cantidadInput; // 1 unidad = 1 stock
+        } else if (tipo === 'blister') {
+            precioCobrado = productoActual.p_blister;
+            unidadesRealesARestar = cantidadInput * productoActual.u_blister; // 2 blisters * 10 = 20 stock
+        } else if (tipo === 'caja') {
+            precioCobrado = productoActual.p_caja;
+            unidadesRealesARestar = cantidadInput * productoActual.u_caja; // 1 caja * 100 = 100 stock
+        }
+
+        // Revisamos si el producto ya está en el ticket (con la misma presentación)
+        const itemExistente = carrito.find(item => item.id_producto === productoActual.id && item.tipo === tipo);
+        
+        if (itemExistente) {
+            itemExistente.cantidad_input += cantidadInput;
+            itemExistente.unidades_restar += unidadesRealesARestar;
+            itemExistente.subtotal = itemExistente.cantidad_input * itemExistente.precio_cobrado;
+        } else {
+            carrito.push({
+                id_producto: productoActual.id,
+                nombre_display: etiquetaNombre,
+                tipo: tipo,
+                cantidad_input: cantidadInput, // Lo que ve el cajero (ej. 2 blisters)
+                unidades_restar: unidadesRealesARestar, // Lo que Python restará (ej. 20 unidades)
+                precio_cobrado: precioCobrado,
+                subtotal: cantidadInput * precioCobrado
+            });
+        }
+        
+        actualizarTicket();
+        modalVenta.hide(); // Cerramos la ventana
+    });
+
+    // === FUNCIONES DEL TICKET (Igual que antes pero usando nuestros nuevos datos) ===
+    function actualizarTicket() {
+        carritoUI.innerHTML = ''; 
+        let total = 0;
+
+        if (carrito.length === 0) {
+            carritoUI.innerHTML = '<li class="list-group-item text-center text-muted">Aún no hay productos en la venta</li>';
+            btnCobrar.disabled = true;
+            totalUI.innerText = 'S/ 0.00';
+            return;
+        }
+
+        carrito.forEach((item, index) => {
+            total += item.subtotal;
+            carritoUI.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="my-0">${item.nombre_display}</h6>
+                        <small class="text-muted">${item.cantidad_input} x S/ ${item.precio_cobrado.toFixed(2)}</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="fw-bold me-3">S/ ${item.subtotal.toFixed(2)}</span>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarItem(${index})">x</button>
+                    </div>
+                </li>
+            `;
+        });
+
+        totalUI.innerText = `S/ ${total.toFixed(2)}`;
+        btnCobrar.disabled = false;
+    }
+
+    window.eliminarItem = function(index) {
+        carrito.splice(index, 1);
+        actualizarTicket();
+    };
+
+    // === ENVIAR VENTA AL SERVIDOR ===
+    btnCobrar.addEventListener('click', async () => {
+        // Armamos el paquete. Python SOLO necesita saber cuántas unidades REALES restar.
+        // Convertimos todo a "unidades base" para mandarlo a FastApi.
+        
+        let detallesUnificados = [];
+        
+        carrito.forEach(item => {
+            // Si el mismo producto se cobró en blíster y unidad, los sumamos para Python
+            let existente = detallesUnificados.find(d => d.id_producto === item.id_producto);
+            if (existente) {
+                existente.cantidad += item.unidades_restar;
+            } else {
+                detallesUnificados.push({
+                    id_producto: item.id_producto,
+                    cantidad: item.unidades_restar
+                });
+            }
+        });
+
+        const payload = {
+            id_usuario: 1, 
+            detalles: detallesUnificados
+        };
+
+        const response = await fetch('/ventas/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            alert('¡Venta registrada! El stock se ha restado correctamente.');
+            window.location.reload(); 
+        } else {
+            alert('Error al registrar la venta. Verifica el stock.');
+        }
+    });
+</script>
+{% endblock %}

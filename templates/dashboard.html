@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio | SistemaSmart{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Panel de Control</h2>
+    <p class="text-muted mb-0">Resumen financiero y operativo en tiempo real</p>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card shadow-sm text-white bg-primary mb-3 h-100">
+            <div class="card-body">
+                <h6 class="card-title fw-light">Ingresos Totales</h6>
+                <h3 class="fw-bold">S/ {{ "%.2f"|format(total_ingresos or 0) }}</h3>
+                <small>Ventas brutas</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card shadow-sm text-white bg-danger mb-3 h-100">
+            <div class="card-body">
+                <h6 class="card-title fw-light">Costo de Ventas</h6>
+                <h3 class="fw-bold">S/ {{ "%.2f"|format(total_gastos or 0) }}</h3>
+                <small>Mercadería vendida</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card shadow-sm text-white bg-success mb-3 h-100">
+            <div class="card-body">
+                <h6 class="card-title fw-light">Utilidad Neta</h6>
+                <h3 class="fw-bold">S/ {{ "%.2f"|format(ganancia_neta or 0) }}</h3>
+                <small>Tu ganancia real</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm text-dark bg-warning mb-3 h-100">
+            <div class="card-body">
+                <h6 class="card-title fw-light">Alertas de Stock</h6>
+                <h3 class="fw-bold">{{ productos_bajo_stock }} <span class="fs-6 fw-normal">prod.</span></h3>
+                <small>Por agotarse (&lt; 20)</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 text-danger fw-bold">⚠️ Atención Requerida (Stock Bajo)</h5>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% if alertas_stock %}
+                    {% for producto in alertas_stock %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ producto.nombre }}
+                        <span class="badge bg-danger rounded-pill">{{ producto.stock_actual }} unid.</span>
+                    </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="list-group-item text-muted">Todo el inventario está en niveles óptimos.</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 mb-4">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-primary fw-bold">📊 Ingresos</h5>
+                
+                <select id="filtroGrafica" class="form-select form-select-sm w-auto">
+                    <option value="dia">Por Día</option>
+                    <option value="mes">Por Mes</option>
+                </select>
+            </div>
+            
+            <div class="card-body">
+                <canvas id="graficaVentas" style="max-height: 250px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // 1. Guardamos los datos que Python nos envió
+    const datosPorDia = {
+        fechas: {{ fechas_dia | tojson  }},
+        totales: {{ totales_dia | tojson  }}
+    };
+
+    const datosPorMes = {
+        fechas: {{ fechas_mes | tojson  }},
+        totales: {{ totales_mes | tojson  }}
+    };
+
+    // 2. Iniciamos la gráfica mostrando los días por defecto
+    const ctx = document.getElementById('graficaVentas').getContext('2d');
+    let miGrafica = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datosPorDia.fechas,
+            datasets: [{
+                label: 'Ingresos (S/)',
+                data: datosPorDia.totales,
+                backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // 3. Escuchamos cuando el usuario cambia el menú desplegable
+    document.getElementById('filtroGrafica').addEventListener('change', function(evento) {
+        const seleccion = evento.target.value;
+
+        if (seleccion === 'dia') {
+            miGrafica.data.labels = datosPorDia.fechas;
+            miGrafica.data.datasets[0].data = datosPorDia.totales;
+        } else {
+            miGrafica.data.labels = datosPorMes.fechas;
+            miGrafica.data.datasets[0].data = datosPorMes.totales;
+        }
+        
+        miGrafica.update();
+    });
+</script>
+{% endblock %}

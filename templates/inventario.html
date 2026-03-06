@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Inventario | SistemaSmart{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Gestión de Inventario</h2>
+    <div>
+        <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#modalCategorias">⚙️ Categorías</button>
+        <button class="btn btn-primary" onclick="abrirModalCrear()">+ Nuevo Producto</button>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Stock Actual</th>
+                        <th>Costo Caja</th>
+                        <th>Precio Venta</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos if producto.activo %}
+                    <tr>
+                        <td>{{ producto.id_producto }}</td>
+                        <td class="fw-bold">{{ producto.nombre }}</td>
+                        <td>
+                            {% for cat in categorias if cat.id_categoria == producto.id_categoria %}
+                                {{ cat.nombre }}
+                            {% endfor %}
+                        </td>
+                        <td>
+                            {% if producto.stock_actual < 20 %}
+                                <span class="badge bg-danger">{{ producto.stock_actual }} unid.</span>
+                            {% else %}
+                                <span class="badge bg-success">{{ producto.stock_actual }} unid.</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">S/ {{ producto.precio_costo_caja }}</td>
+                        <td>S/ {{ producto.precio_unidad }} (Unid.)</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning me-1" 
+                                onclick="abrirModalEditar(
+                                    {{ producto.id_producto }}, '{{ producto.nombre }}', {{ producto.id_categoria }},
+                                    {{ producto.stock_actual }}, {{ producto.unidades_por_blister }}, {{ producto.unidades_por_caja }},
+                                    {{ producto.precio_unidad }}, {{ producto.precio_blister or 0 }}, {{ producto.precio_caja or 0 }},
+                                    {{ producto.precio_costo_caja or 0 }}, '{{ producto.fecha_vencimiento or '' }}'
+                                )">✏️</button>
+                            <button class="btn btn-sm btn-danger" onclick="inhabilitarProducto({{ producto.id_producto }})">🗑️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalProducto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="tituloModalProducto">Registrar Nuevo Producto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProducto">
+                    <input type="hidden" id="producto_id">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Nombre del Producto</label>
+                            <input type="text" class="form-control" id="nombre" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Categoría</label>
+                            <select class="form-select" id="id_categoria" required>
+                                <option value="">Seleccione...</option>
+                                {% for cat in categorias if cat.activo %}
+                                    <option value="{{ cat.id_categoria }}">{{ cat.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-primary">📦 Cajas a Ingresar</label>
+                            <input type="number" class="form-control border-primary" id="cantidad_cajas" required>
+                            <small class="text-muted">El sistema calculará el stock</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Unidades x Blíster</label>
+                            <input type="number" class="form-control" id="unidades_por_blister" value="10" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Unidades x Caja (Total)</label>
+                            <input type="number" class="form-control" id="unidades_por_caja" value="100" required>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-danger">Costo x Caja (S/)</label>
+                            <input type="number" step="0.01" class="form-control border-danger" id="precio_costo_caja" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Precio Caja (S/)</label>
+                            <input type="number" step="0.01" class="form-control" id="precio_caja">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Precio Blíster (S/)</label>
+                            <input type="number" step="0.01" class="form-control" id="precio_blister">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Precio Unidad (S/)</label>
+                            <input type="number" step="0.01" class="form-control" id="precio_unidad" required>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">Fecha de Vencimiento</label>
+                            <input type="date" class="form-control" id="fecha_vencimiento">
+                        </div>
+                    </div>
+                    <div class="modal-footer mt-4">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Producto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCategorias" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title">Gestión de Categorías</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCategoria" class="d-flex gap-2 mb-4">
+                    <input type="text" class="form-control" id="nombre_categoria" placeholder="Nueva categoría..." required>
+                    <button type="submit" class="btn btn-success">Añadir</button>
+                </form>
+                
+                <ul class="list-group">
+                    {% for cat in categorias if cat.activo %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ cat.nombre }}
+                        <button class="btn btn-sm btn-outline-danger" onclick="inhabilitarCategoria({{ cat.id_categoria }})">Inhabilitar</button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Instancia del modal de Bootstrap para poder abrirlo/cerrarlo con JS
+    const modalProductoObj = new bootstrap.Modal(document.getElementById('modalProducto'));
+    const formProducto = document.getElementById('formProducto');
+
+    // --- 1. LÓGICA DE PRODUCTOS (Crear / Editar) ---
+
+    // Función para limpiar el formulario y abrirlo en modo "Crear"
+    window.abrirModalCrear = function() {
+        document.getElementById('tituloModalProducto').innerText = "Registrar Nuevo Producto";
+        document.getElementById('producto_id').value = ""; // Vaciamos el ID oculto
+        formProducto.reset(); // Limpia todos los campos
+        modalProductoObj.show();
+    };
+
+    // Función para llenar el formulario y abrirlo en modo "Editar"
+    window.abrirModalEditar = function(id, nombre, id_cat, stock, u_blister, u_caja, p_uni, p_blister, p_caja, costo, vencimiento) {
+        document.getElementById('tituloModalProducto').innerText = "Editar Producto";
+        
+        // Llenamos los campos con los datos actuales
+        document.getElementById('producto_id').value = id;
+        document.getElementById('nombre').value = nombre;
+        document.getElementById('id_categoria').value = id_cat;
+        
+        // Matemática inversa: Si tengo 200 en stock y la caja trae 100, tengo 2 cajas.
+        let cajasActuales = (stock / u_caja) || 0;
+        document.getElementById('cantidad_cajas').value = cajasActuales;
+        
+        document.getElementById('unidades_por_blister').value = u_blister;
+        document.getElementById('unidades_por_caja').value = u_caja;
+        document.getElementById('precio_costo_caja').value = costo;
+        document.getElementById('precio_caja').value = p_caja;
+        document.getElementById('precio_blister').value = p_blister;
+        document.getElementById('precio_unidad').value = p_uni;
+        document.getElementById('fecha_vencimiento').value = vencimiento;
+
+        modalProductoObj.show();
+    };
+
+    // Al darle al botón "Guardar Producto"
+    formProducto.addEventListener('submit', async (e) => {
+        e.preventDefault(); 
+        
+        const id_producto = document.getElementById('producto_id').value;
+        const metodo = id_producto ? 'PUT' : 'POST'; // Si hay ID actualizamos, si no, creamos
+        const url = id_producto ? `/productos/${id_producto}` : '/productos/';
+
+        const productoData = {
+            id_categoria: parseInt(document.getElementById('id_categoria').value),
+            nombre: document.getElementById('nombre').value,
+            cantidad_cajas: parseInt(document.getElementById('cantidad_cajas').value),
+            unidades_por_blister: parseInt(document.getElementById('unidades_por_blister').value),
+            unidades_por_caja: parseInt(document.getElementById('unidades_por_caja').value),
+            precio_unidad: parseFloat(document.getElementById('precio_unidad').value),
+            precio_blister: parseFloat(document.getElementById('precio_blister').value) || null,
+            precio_caja: parseFloat(document.getElementById('precio_caja').value) || null,
+            precio_costo_caja: parseFloat(document.getElementById('precio_costo_caja').value),
+            fecha_vencimiento: document.getElementById('fecha_vencimiento').value || null
+        };
+
+        const response = await fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(productoData)
+        });
+
+        if (response.ok) {
+            window.location.reload(); 
+        } else {
+            alert("Error al guardar el producto.");
+        }
+    });
+
+    // --- 2. LÓGICA PARA INHABILITAR (Soft Delete) ---
+
+    window.inhabilitarProducto = async function(id) {
+        if(confirm("¿Estás seguro de inhabilitar este producto? No aparecerá más en el punto de venta.")) {
+            await fetch(`/productos/${id}`, { method: 'DELETE' });
+            window.location.reload();
+        }
+    };
+
+    window.inhabilitarCategoria = async function(id) {
+        if(confirm("¿Seguro de inhabilitar esta categoría?")) {
+            await fetch(`/categorias/${id}`, { method: 'DELETE' });
+            window.location.reload();
+        }
+    };
+
+    // --- 3. LÓGICA PARA CREAR CATEGORÍA DESDE LA WEB ---
+    
+    document.getElementById('formCategoria').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nombreCat = document.getElementById('nombre_categoria').value;
+        
+        const response = await fetch('/categorias/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: nombreCat })
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        }
+    });
+</script>
+{% endblock %}
