@@ -9,5 +9,5 @@ __pycache__/
 # Base de datos
 inventario.db
 
-# Variables de entorno (si usas en el futuro)
+# Variables de entorno
 .env
