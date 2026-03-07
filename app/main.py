@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI, Request, Depends
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -6,21 +8,31 @@ from app.routes import router, get_db
 from app import models
 from app.database import engine
 
+# Creamos las tablas físicas en la BD
 models.Base.metadata.create_all(bind=engine)
 
+# --- RUTAS ABSOLUTAS (A prueba de fallos) ---
+# Esto averigua dinámicamente dónde está la carpeta principal de tu proyecto
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+
+# Inicializamos la aplicación
 app = FastAPI(title="Sistema de Inventario API V2")
+
+# Le damos la ruta absoluta exacta a FastAPI
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 app.include_router(router)
-templates = Jinja2Templates(directory="templates")
+# También usamos la ruta absoluta para los templates por seguridad
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # --- FUNCIÓN PUENTE (Para que el HTML no se rompa) ---
 def preparar_productos_para_html(db: Session):
     productos = db.query(models.Producto).all()
     for p in productos:
-        # Sumamos el stock de todos sus lotes activos
         lotes_activos = [l for l in p.lotes if l.activo]
         p.stock_actual = sum(l.stock_unidades for l in lotes_activos)
-        
-        # Simulamos los datos del lote más viejo para que el HTML los muestre
         if lotes_activos:
             lote_proximo = min(lotes_activos, key=lambda x: x.fecha_vencimiento)
             p.precio_costo_caja = lote_proximo.precio_costo_caja
@@ -41,12 +53,11 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
     ventas = db.query(models.Venta).all()
     total_ingresos = sum(venta.total_venta for venta in ventas)
 
-    # Gastos simplificados (usamos el costo del lote más viejo como referencia para V1)
     detalles_vendidos = db.query(models.DetalleVenta).all()
     total_gastos = 0
     for detalle in detalles_vendidos:
         producto = next((p for p in productos_preparados if p.id_producto == detalle.id_producto), None)
-        if producto and producto.unidades_por_caja > 0 and getattr(producto, 'precio_costo_caja', 0):
+        if producto and getattr(producto, 'unidades_por_caja', 0) > 0 and getattr(producto, 'precio_costo_caja', 0):
             costo_por_unidad = producto.precio_costo_caja / producto.unidades_por_caja
             total_gastos += (costo_por_unidad * detalle.cantidad_unidades)
             
