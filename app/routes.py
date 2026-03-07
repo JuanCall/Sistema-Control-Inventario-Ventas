@@ -1,16 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from app.database import SessionLocal
 from app import models
 from datetime import date
-from typing import List, Optional
 
-# 1. Inicializamos el "Enrutador" (agrupa todas nuestras URLs)
 router = APIRouter()
 
-# 2. Dependencia para conectarnos a la base de datos en cada petición
 def get_db():
     db = SessionLocal()
     try:
@@ -18,52 +15,26 @@ def get_db():
     finally:
         db.close()
 
-# 3. El Esquema (Pydantic): Define qué datos EXIGIMOS recibir desde internet
 class CategoriaCreate(BaseModel):
     nombre: str
+    class Config: orm_mode = True
 
-    class Config:
-        orm_mode = True
-
-# Este esquema es para LEER (hereda el nombre y le suma el ID)
 class CategoriaResponse(CategoriaCreate):
     id_categoria: int
 
-# Esquema para CREAR (Lo que el usuario envía desde el navegador)
+# Esquema para crear un Producto + su primer Lote
 class ProductoCreate(BaseModel):
     id_categoria: int
     nombre: str
-    cantidad_cajas: int
-    unidades_por_blister: int # OBLIGATORIO para hacer el cálculo
-    unidades_por_caja: int    # OBLIGATORIO para hacer el cálculo
-    precio_unidad: float
-    precio_blister: Optional[float] = None
-    precio_caja: Optional[float] = None
-    precio_costo_caja: float  # NUEVO: Cuánto te costó
-    fecha_vencimiento: Optional[date] = None
-
-    class Config:
-        orm_mode = True
-
-# Esquema para RESPONDER (Lo que la API devuelve, incluyendo el ID generado)
-class ProductoResponse(BaseModel):
-    id_producto: int
-    id_categoria: int
-    nombre: str
-    stock_actual: int # El sistema devuelve el stock ya calculado
+    cantidad_cajas_inicial: int # Para el primer lote
     unidades_por_blister: int
     unidades_por_caja: int
     precio_unidad: float
-    precio_blister: Optional[float]
-    precio_caja: Optional[float]
-    precio_costo_caja: Optional[float]
-    fecha_vencimiento: Optional[date]
-    activo: bool
+    precio_blister: Optional[float] = None
+    precio_caja: Optional[float] = None
+    precio_costo_caja: float # Costo de este primer lote
+    fecha_vencimiento: date  # Vencimiento de este primer lote
 
-    class Config:
-        orm_mode = True
-
-# --- ESQUEMAS DE VENTAS ---
 class DetalleVentaCreate(BaseModel):
     id_producto: int
     cantidad: int
@@ -72,153 +43,160 @@ class VentaCreate(BaseModel):
     id_usuario: int = 1
     detalles: List[DetalleVentaCreate]
 
-# 4. LA RUTA: Recibe la información y la guarda en la base de datos
+# --- RUTAS DE CATEGORÍAS ---
 @router.post("/categorias/", tags=["Categorías"])
 def crear_categoria(categoria: CategoriaCreate, db: Session = Depends(get_db)):
-    # A. Preparamos el modelo de Python con los datos que llegaron
     nueva_categoria = models.Categoria(nombre=categoria.nombre)
-    
-    # B. Lo agregamos a la base de datos
     db.add(nueva_categoria)
-    
-    # C. Confirmamos los cambios (como darle a "Guardar")
     db.commit()
-    
-    # D. Refrescamos para obtener el ID que SQLite le asignó automáticamente
     db.refresh(nueva_categoria)
-    
-    # E. Devolvemos la categoría recién creada al navegador
     return nueva_categoria
 
-# 5. RUTA PARA LISTAR: Obtiene todas las categorías guardadas
 @router.get("/categorias/", response_model=List[CategoriaResponse], tags=["Categorías"])
 def obtener_categorias(db: Session = Depends(get_db)):
-    # Simplemente le pedimos a la sesión que busque todos los registros de la clase Categoria
-    categorias = db.query(models.Categoria).all()
+    return db.query(models.Categoria).filter(models.Categoria.activo == True).all()
+
+@router.delete("/categorias/{id_categoria}", tags=["Categorias"])
+def inhabilitar_categoria(id_categoria: int, db: Session = Depends(get_db)):
+    db_cat = db.query(models.Categoria).filter(models.Categoria.id_categoria == id_categoria).first()
+    db_cat.activo = False
+    db.commit()
+    return {"mensaje": "Categoría inhabilitada"}
+
+# --- RUTAS DE PRODUCTOS Y LOTES ---
+
+# ==========================================
+# RUTAS DE LOTES (COMPRAS NUEVAS V2)
+# ==========================================
+class LoteCreate(BaseModel):
+    id_producto: int
+    cantidad_cajas: int
+    precio_costo_caja: float
+    fecha_vencimiento: date
+
+@router.post("/lotes/", tags=["Lotes"])
+def registrar_nuevo_lote(lote: LoteCreate, db: Session = Depends(get_db)):
+    # 1. Buscamos cuántas unidades trae la caja de este producto
+    producto = db.query(models.Producto).filter(models.Producto.id_producto == lote.id_producto).first()
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        
+    # 2. Calculamos las pastillas totales que están entrando
+    unidades_ingresadas = lote.cantidad_cajas * producto.unidades_por_caja
     
-    # Python y FastAPI se encargan de convertir esa lista de objetos a JSON automáticamente
-    return categorias
+    # 3. Creamos el lote físico
+    nuevo_lote = models.Lote(
+        id_producto=lote.id_producto,
+        stock_unidades=unidades_ingresadas,
+        precio_costo_caja=lote.precio_costo_caja,
+        fecha_vencimiento=lote.fecha_vencimiento
+    )
+    db.add(nuevo_lote)
+    db.commit()
+    
+    return {"mensaje": "Nuevo lote de mercadería registrado con éxito"}
 
-# --- RUTAS PARA PRODUCTOS ---
+@router.post("/productos/", tags=["Productos"])
+def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
+    # 1. Creamos el catálogo base (sin stock)
+    nuevo_producto = models.Producto(
+        id_categoria=producto.id_categoria,
+        nombre=producto.nombre,
+        unidades_por_blister=producto.unidades_por_blister,
+        unidades_por_caja=producto.unidades_por_caja,
+        precio_unidad=producto.precio_unidad,
+        precio_blister=producto.precio_blister,
+        precio_caja=producto.precio_caja
+    )
+    db.add(nuevo_producto)
+    db.commit()
+    db.refresh(nuevo_producto)
 
-# 1. Actualizar Producto Existente
+    # 2. Creamos su PRIMER LOTE con las cantidades y fechas
+    unidades_totales = producto.cantidad_cajas_inicial * producto.unidades_por_caja
+    primer_lote = models.Lote(
+        id_producto=nuevo_producto.id_producto,
+        stock_unidades=unidades_totales,
+        precio_costo_caja=producto.precio_costo_caja,
+        fecha_vencimiento=producto.fecha_vencimiento
+    )
+    db.add(primer_lote)
+    db.commit()
+    
+    return {"mensaje": "Producto y Lote 1 creados con éxito"}
+
 @router.put("/productos/{id_producto}", tags=["Productos"])
 def actualizar_producto(id_producto: int, producto: ProductoCreate, db: Session = Depends(get_db)):
+    # En V2, Editar un producto solo actualiza sus nombres y precios de venta.
     db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
-    
     db_producto.id_categoria = producto.id_categoria
     db_producto.nombre = producto.nombre
-    # Recalculamos el stock basado en las nuevas cajas
-    db_producto.stock_actual = producto.cantidad_cajas * producto.unidades_por_caja
     db_producto.unidades_por_blister = producto.unidades_por_blister
     db_producto.unidades_por_caja = producto.unidades_por_caja
     db_producto.precio_unidad = producto.precio_unidad
     db_producto.precio_blister = producto.precio_blister
     db_producto.precio_caja = producto.precio_caja
-    db_producto.precio_costo_caja = producto.precio_costo_caja
-    db_producto.fecha_vencimiento = producto.fecha_vencimiento
-    
     db.commit()
-    return {"mensaje": "Producto actualizado con éxito"}
+    return {"mensaje": "Datos generales del producto actualizados"}
 
-# 2. Inhabilitar Producto (Soft Delete)
 @router.delete("/productos/{id_producto}", tags=["Productos"])
 def inhabilitar_producto(id_producto: int, db: Session = Depends(get_db)):
     db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
-    db_producto.activo = False # Lo ocultamos, pero no lo borramos de la base de datos
+    db_producto.activo = False
     db.commit()
     return {"mensaje": "Producto inhabilitado"}
 
-# 3. RUTA PARA CREAR PRODUCTO
-@router.post("/productos/", response_model=ProductoResponse, tags=["Productos"])
-def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
-    
-    # 1. El sistema calcula las unidades totales automáticamente
-    stock_calculado = producto.cantidad_cajas * producto.unidades_por_caja
-    
-    # 2. Preparamos el modelo para la base de datos
-    nuevo_producto = models.Producto(
-        id_categoria=producto.id_categoria,
-        nombre=producto.nombre,
-        stock_actual=stock_calculado, # Inyectamos la matemática aquí
-        unidades_por_blister=producto.unidades_por_blister,
-        unidades_por_caja=producto.unidades_por_caja,
-        precio_unidad=producto.precio_unidad,
-        precio_blister=producto.precio_blister,
-        precio_caja=producto.precio_caja,
-        precio_costo_caja=producto.precio_costo_caja,
-        fecha_vencimiento=producto.fecha_vencimiento
-    )
-    
-    db.add(nuevo_producto)
-    db.commit()
-    db.refresh(nuevo_producto)
-    
-    return nuevo_producto
-
-# 4. RUTA PARA LISTAR: Obtiene todos los productos guardados
-@router.get("/productos/", response_model=List[ProductoResponse], tags=["Productos"])
-def obtener_productos(db: Session = Depends(get_db)):
-    productos = db.query(models.Producto).all()
-    return productos
-
-
-# 8. RUTA PARA COBRAR LA VENTA
+# --- RUTA DE VENTAS (MÉTODO PEPS / FIFO) ---
 @router.post("/ventas/", tags=["Ventas"])
 def registrar_venta(venta: VentaCreate, db: Session = Depends(get_db)):
     total_venta = 0
-    
-    # Paso 1: Creamos el recibo general (aún en S/ 0.00)
     nueva_venta = models.Venta(id_usuario=venta.id_usuario, total_venta=0)
     db.add(nueva_venta)
-    db.flush() # Guardamos temporalmente para obtener el id_venta generado
+    db.flush() 
     
-    # Paso 2: Procesamos cada producto que llegó en el carrito
     for item in venta.detalles:
-        # Buscamos el producto en la base de datos
         producto_db = db.query(models.Producto).filter(models.Producto.id_producto == item.id_producto).first()
         
-        # Validación de seguridad: ¿Hay suficiente stock?
-        if producto_db.stock_actual < item.cantidad:
-            raise HTTPException(status_code=400, detail=f"Stock insuficiente para el producto {producto_db.nombre}")
-            
-        # Descontamos el stock
-        producto_db.stock_actual -= item.cantidad
+        # Obtenemos TODOS los lotes activos de este producto, ordenados por fecha de vencimiento (el más viejo primero)
+        lotes_activos = db.query(models.Lote).filter(
+            models.Lote.id_producto == item.id_producto,
+            models.Lote.activo == True
+        ).order_by(models.Lote.fecha_vencimiento.asc()).all()
         
-        # Calculamos la matemática real (por seguridad, no confiamos en el precio del HTML)
+        stock_total = sum(l.stock_unidades for l in lotes_activos)
+        
+        if stock_total < item.cantidad:
+            raise HTTPException(status_code=400, detail=f"Stock insuficiente para {producto_db.nombre}. Disponible: {stock_total}")
+            
+        unidades_a_descontar = item.cantidad
+        
+        # ALGORITMO PEPS: Descontamos lote por lote
+        for lote in lotes_activos:
+            if unidades_a_descontar <= 0:
+                break
+                
+            if lote.stock_unidades <= unidades_a_descontar:
+                # Vaciamos este lote por completo
+                unidades_a_descontar -= lote.stock_unidades
+                lote.stock_unidades = 0
+                lote.activo = False # El lote murió
+            else:
+                # El lote tiene suficientes para cubrir lo que falta
+                lote.stock_unidades -= unidades_a_descontar
+                unidades_a_descontar = 0
+                
+        # Calculamos ingresos
         subtotal_item = producto_db.precio_unidad * item.cantidad
         total_venta += subtotal_item
         
-        # Creamos el detalle de esta línea del recibo
         nuevo_detalle = models.DetalleVenta(
             id_venta=nueva_venta.id_venta,
             id_producto=item.id_producto,
             cantidad_unidades=item.cantidad,
-            precio_cobrado=producto_db.precio_unidad,
-            subtotal=subtotal_item
+            precio_unitario_cobrado=producto_db.precio_unidad
         )
         db.add(nuevo_detalle)
         
-    # Paso 3: Actualizamos el recibo con el total verdadero y confirmamos todo en SQLite
     nueva_venta.total_venta = total_venta
     db.commit()
-    
-    return {"mensaje": "Venta exitosa", "total": total_venta}
-
-# --- RUTAS PARA CATEGORÍAS ---
-
-# 1. Crear Categoría desde el sistema (para no usar Swagger)
-@router.post("/categorias/", tags=["Categorias"])
-def crear_categoria(categoria: CategoriaCreate, db: Session = Depends(get_db)):
-    nueva_categoria = models.Categoria(nombre=categoria.nombre)
-    db.add(nueva_categoria)
-    db.commit()
-    return {"mensaje": "Categoría creada con éxito"}
-
-# 2. Inhabilitar Categoría
-@router.delete("/categorias/{id_categoria}", tags=["Categorias"])
-def inhabilitar_categoria(id_categoria: int, db: Session = Depends(get_db)):
-    db_categoria = db.query(models.Categoria).filter(models.Categoria.id_categoria == id_categoria).first()
-    db_categoria.activo = False
-    db.commit()
-    return {"mensaje": "Categoría inhabilitada"}
+    return {"mensaje": "Venta exitosa con descuento PEPS", "total": total_venta}

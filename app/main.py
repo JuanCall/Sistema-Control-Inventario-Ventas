@@ -6,45 +6,54 @@ from app.routes import router, get_db
 from app import models
 from app.database import engine
 
-# Esta es la línea que crea las tablas físicas
 models.Base.metadata.create_all(bind=engine)
 
-# Inicializamos la aplicación
-app = FastAPI(title="Sistema de Inventario API")
-
-# Conectamos las rutas a la aplicación principal
+app = FastAPI(title="Sistema de Inventario API V2")
 app.include_router(router)
-
-# Configuramos la carpeta donde están nuestros archivos HTML
 templates = Jinja2Templates(directory="templates")
 
-# RUTA DEL DASHBOARD FINANCIERO
+# --- FUNCIÓN PUENTE (Para que el HTML no se rompa) ---
+def preparar_productos_para_html(db: Session):
+    productos = db.query(models.Producto).all()
+    for p in productos:
+        # Sumamos el stock de todos sus lotes activos
+        lotes_activos = [l for l in p.lotes if l.activo]
+        p.stock_actual = sum(l.stock_unidades for l in lotes_activos)
+        
+        # Simulamos los datos del lote más viejo para que el HTML los muestre
+        if lotes_activos:
+            lote_proximo = min(lotes_activos, key=lambda x: x.fecha_vencimiento)
+            p.precio_costo_caja = lote_proximo.precio_costo_caja
+            p.fecha_vencimiento = lote_proximo.fecha_vencimiento
+        else:
+            p.precio_costo_caja = 0
+            p.fecha_vencimiento = ""
+    return productos
+
+# --- RUTAS WEB ---
 @app.get("/", tags=["Interfaz Web"])
 def vista_dashboard(request: Request, db: Session = Depends(get_db)):
-    # 1. Estadísticas Generales (Solo contamos productos activos)
-    total_productos = db.query(models.Producto).filter(models.Producto.activo == True).count()
-    productos_bajo_stock = db.query(models.Producto).filter(models.Producto.stock_actual < 20, models.Producto.activo == True).count()
+    productos_preparados = preparar_productos_para_html(db)
     
-    # 2. Cálculos Financieros
+    total_productos = sum(1 for p in productos_preparados if p.activo)
+    productos_bajo_stock = sum(1 for p in productos_preparados if p.activo and p.stock_actual < 20)
+    
     ventas = db.query(models.Venta).all()
     total_ingresos = sum(venta.total_venta for venta in ventas)
 
-    # NUEVO: Calcular los Gastos (Costo de la mercadería vendida)
+    # Gastos simplificados (usamos el costo del lote más viejo como referencia para V1)
     detalles_vendidos = db.query(models.DetalleVenta).all()
     total_gastos = 0
     for detalle in detalles_vendidos:
-        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
-        # Verificamos que el producto tenga configurado un costo y unidades de caja
-        if producto and producto.unidades_por_caja > 0 and producto.precio_costo_caja:
+        producto = next((p for p in productos_preparados if p.id_producto == detalle.id_producto), None)
+        if producto and producto.unidades_por_caja > 0 and getattr(producto, 'precio_costo_caja', 0):
             costo_por_unidad = producto.precio_costo_caja / producto.unidades_por_caja
             total_gastos += (costo_por_unidad * detalle.cantidad_unidades)
-    
-    # NUEVO: La Ganancia Real
+            
     ganancia_neta = total_ingresos - total_gastos
 
-    alertas_stock = db.query(models.Producto).filter(models.Producto.stock_actual < 20, models.Producto.activo == True).limit(5).all()
+    alertas_stock = [p for p in productos_preparados if p.activo and p.stock_actual < 20][:5]
 
-    # --- DATOS PARA LA GRÁFICA ---
     ventas_dia = db.query(
         func.strftime('%Y-%m-%d', models.Venta.fecha_hora).label("fecha"),
         func.sum(models.Venta.total_venta).label("total")
@@ -62,8 +71,8 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
             "total_productos": total_productos,
             "productos_bajo_stock": productos_bajo_stock,
             "total_ingresos": total_ingresos,
-            "total_gastos": total_gastos,       # <-- Enviamos los gastos calculados
-            "ganancia_neta": ganancia_neta,     # <-- Enviamos la ganancia real
+            "total_gastos": total_gastos,
+            "ganancia_neta": ganancia_neta,
             "alertas_stock": alertas_stock,
             "fechas_dia": [v.fecha for v in ventas_dia],
             "totales_dia": [float(v.total) for v in ventas_dia],
@@ -72,28 +81,19 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
         }
     )
 
-# Ruta para la interfaz visual del inventario
 @app.get("/inventario", tags=["Interfaz Web"])
 def vista_inventario(request: Request, db: Session = Depends(get_db)):
-    # Pedimos productos y categorías a SQLite
-    lista_productos = db.query(models.Producto).all()
-    lista_categorias = db.query(models.Categoria).all() # <-- NUEVO
+    lista_productos = preparar_productos_para_html(db)
+    lista_categorias = db.query(models.Categoria).filter(models.Categoria.activo == True).all()
     
-    # Enviamos ambas listas al HTML
     return templates.TemplateResponse(
         "inventario.html", 
-        {
-            "request": request, 
-            "productos": lista_productos,
-            "categorias": lista_categorias # <-- NUEVO
-        }
+        {"request": request, "productos": lista_productos, "categorias": lista_categorias}
     )
 
-# Ruta para la pantalla de la Caja Registradora
 @app.get("/punto_venta", tags=["Interfaz Web"])
 def vista_punto_venta(request: Request, db: Session = Depends(get_db)):
-    lista_productos = db.query(models.Producto).all()
-    
+    lista_productos = preparar_productos_para_html(db)
     return templates.TemplateResponse(
         "punto_venta.html", 
         {"request": request, "productos": lista_productos}
