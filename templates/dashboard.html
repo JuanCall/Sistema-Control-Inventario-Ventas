@@ -2,6 +2,10 @@
 
 {% block title %}Inicio | SistemaSmart{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Panel de Control</h2>

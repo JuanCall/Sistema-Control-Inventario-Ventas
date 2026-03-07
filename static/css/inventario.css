@@ -1,0 +1,127 @@
+/* ============================================================
+   inventario.css — Gestión de Inventario | SistemaSmart Farmacia
+   ============================================================ */
+
+/* ── Cabecera de página ─────────────────────────────────── */
+.inventario-header h2 {
+  font-size: 1.2rem;
+}
+
+/* ── Tabla principal de productos ────────────────────────── */
+.tabla-inventario th:last-child,
+.tabla-inventario td:last-child {
+  white-space: nowrap;
+}
+
+/* Nombre del producto */
+.tabla-inventario td.nombre-producto {
+  font-weight: 700;
+  color: var(--color-primary);
+  max-width: 200px;
+}
+
+/* Columna de acciones — botones pequeños y compactos */
+.tabla-inventario .acciones-col { white-space: nowrap; }
+
+.tabla-inventario .btn-sm {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.55rem;
+  line-height: 1.4;
+  margin-right: 2px;
+}
+
+/* ── Fila de Lotes (collapse) ────────────────────────────── */
+.fila-lotes {
+  background: #F8FAFC !important;
+}
+
+.fila-lotes td {
+  padding: 0.75rem 1rem;
+}
+
+.fila-lotes h6 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+/* Cada tarjeta de lote individual */
+.lote-item {
+  border: 1px solid #BAE6FD !important;
+  border-left: 3px solid var(--color-info) !important;
+  border-radius: var(--radius-sm) !important;
+  background: #fff !important;
+  padding: 0.5rem 0.75rem;
+  min-width: 150px;
+  max-width: 220px;
+}
+
+.lote-item small { font-size: 0.77rem; }
+
+/* Fecha de vencimiento en rojo */
+.lote-item .vencimiento {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* ── Modal: Ingresar Mercadería ──────────────────────────── */
+#nombre_producto_lote {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  font-weight: 700;
+  padding: 0.4rem 0.75rem;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem !important;
+}
+
+/* ── Modal: Crear / Editar Producto ──────────────────────── */
+#seccion_primer_lote {
+  background: #F0FDF4;
+  border: 1px dashed #86EFAC;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+#seccion_primer_lote legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-success);
+  letter-spacing: .04em;
+}
+
+/* Separador visual dentro del modal grande */
+.modal-body .row.g-3 + .row.g-3 {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Modal: Categorías ───────────────────────────────────── */
+#formCategoria .form-control {
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+#formCategoria .btn {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* ── Responsive: tabla con scroll horizontal ─────────────── */
+.table-responsive {
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+/* Fecha de vencimiento próxima en la tabla principal */
+td .text-danger.fw-bold {
+  font-size: 0.82rem;
+  background: #FEE2E2;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}

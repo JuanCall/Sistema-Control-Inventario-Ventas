@@ -1,0 +1,293 @@
+/* ============================================================
+   base.css — Tema Global | SistemaSmart Farmacia
+   Fuente: DM Sans (Google Fonts) — carga rápida, legible
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+/* ── Variables ──────────────────────────────────────────── */
+:root {
+  --color-primary:       #0D9488;   /* teal médico */
+  --color-primary-dark:  #0F766E;
+  --color-primary-light: #CCFBF1;
+  --color-accent:        #06B6D4;
+  --color-danger:        #DC2626;
+  --color-warning:       #D97706;
+  --color-success:       #16A34A;
+  --color-info:          #0284C7;
+
+  --bg-body:  #F1F5F9;
+  --bg-card:  #FFFFFF;
+  --bg-nav:   #0F172A;
+
+  --text-main:   #1E293B;
+  --text-muted:  #64748B;
+  --text-light:  #94A3B8;
+
+  --border:       #E2E8F0;
+  --border-focus: #0D9488;
+
+  --radius:    8px;
+  --radius-sm: 5px;
+  --shadow:    0 1px 4px rgba(0,0,0,.08);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.10);
+
+  --font: 'DM Sans', system-ui, sans-serif;
+}
+
+/* ── Reset base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg-body);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Navbar ─────────────────────────────────────────────── */
+.navbar {
+  background: var(--bg-nav) !important;
+  border-bottom: 2px solid var(--color-primary);
+  padding: 0.55rem 1.25rem;
+  box-shadow: var(--shadow-md);
+}
+
+.navbar-brand {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: #fff !important;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.navbar-brand::before {
+  content: '⚕';
+  font-size: 1.1rem;
+  color: var(--color-primary);
+}
+
+/* eliminar el emoji de caja del HTML sin tocar el template */
+.navbar-brand > span.emoji { display: none; }
+
+.nav-link {
+  color: #CBD5E1 !important;
+  font-weight: 500;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.75rem !important;
+  border-radius: var(--radius-sm);
+  transition: color .15s, background .15s;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #fff !important;
+  background: rgba(255,255,255,.07);
+}
+
+/* Línea inferior activa */
+.nav-link.active {
+  border-bottom: 2px solid var(--color-primary);
+  border-radius: 0;
+}
+
+/* ── Container principal ────────────────────────────────── */
+.container {
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+/* ── Tipografía general ─────────────────────────────────── */
+h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+h5 { font-size: 0.95rem; font-weight: 700; }
+h6 { font-size: 0.82rem; }
+
+/* ── Cards ──────────────────────────────────────────────── */
+.card {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+  background: var(--bg-card);
+}
+
+.card-header {
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius) var(--radius) 0 0 !important;
+}
+
+.card-body { padding: 1rem; }
+
+/* Tarjetas de color (KPI del dashboard) */
+.card.bg-primary { background: var(--color-primary)  !important; border-color: var(--color-primary) !important; }
+.card.bg-danger  { background: var(--color-danger)   !important; border-color: var(--color-danger)  !important; }
+.card.bg-success { background: var(--color-success)  !important; border-color: var(--color-success) !important; }
+.card.bg-warning { background: var(--color-warning)  !important; border-color: var(--color-warning) !important; }
+
+.card.bg-primary .card-body,
+.card.bg-danger  .card-body,
+.card.bg-success .card-body { color: #fff; }
+
+.card.bg-warning .card-body { color: #fff; }
+
+/* ── Botones ─────────────────────────────────────────────── */
+.btn {
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: 0.82rem;
+  border-radius: var(--radius-sm);
+  padding: 0.38rem 0.85rem;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary   { background: var(--color-primary)  !important; color: #fff !important; border-color: var(--color-primary)  !important; }
+.btn-success   { background: var(--color-success)  !important; color: #fff !important; border-color: var(--color-success)  !important; }
+.btn-danger    { background: var(--color-danger)   !important; color: #fff !important; border-color: var(--color-danger)   !important; }
+.btn-warning   { background: var(--color-warning)  !important; color: #fff !important; border-color: var(--color-warning)  !important; }
+.btn-info      { background: var(--color-info)     !important; color: #fff !important; border-color: var(--color-info)     !important; }
+.btn-secondary { background: #475569               !important; color: #fff !important; border-color: #475569               !important; }
+
+.btn-primary:hover   { background: var(--color-primary-dark) !important; }
+.btn-success:hover   { background: #15803D !important; }
+.btn-danger:hover    { background: #B91C1C !important; }
+
+/* Outline */
+.btn-outline-secondary {
+  background: transparent !important;
+  color: #475569 !important;
+  border: 1.5px solid #CBD5E1 !important;
+}
+.btn-outline-secondary:hover { background: #F8FAFC !important; }
+
+.btn-outline-info {
+  background: transparent !important;
+  color: var(--color-info) !important;
+  border: 1.5px solid var(--color-info) !important;
+}
+.btn-outline-info:hover { background: #EFF6FF !important; }
+
+.btn-outline-danger {
+  background: transparent !important;
+  color: var(--color-danger) !important;
+  border: 1.5px solid var(--color-danger) !important;
+}
+.btn-outline-danger:hover { background: #FEF2F2 !important; }
+
+/* ── Formularios ─────────────────────────────────────────── */
+.form-control,
+.form-select {
+  font-family: var(--font);
+  font-size: 0.875rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  background: #fff;
+  padding: 0.42rem 0.7rem;
+  box-shadow: none !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13,148,136,.12) !important;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+/* ── Tablas ──────────────────────────────────────────────── */
+.table {
+  font-size: 0.875rem;
+  color: var(--text-main);
+  border-color: var(--border);
+  margin-bottom: 0;
+}
+
+.table thead th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  background: #F8FAFC !important;
+  border-bottom: 2px solid var(--border);
+  padding: 0.6rem 0.75rem;
+  white-space: nowrap;
+}
+
+.table tbody td { padding: 0.6rem 0.75rem; vertical-align: middle; border-color: var(--border); }
+.table-hover tbody tr:hover { background: #F0FDF4; }
+
+/* ── Badges ──────────────────────────────────────────────── */
+.badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3em 0.6em;
+  border-radius: 4px;
+  letter-spacing: .02em;
+}
+
+.badge.bg-danger  { background: #FEE2E2 !important; color: var(--color-danger)  !important; }
+.badge.bg-success { background: #DCFCE7 !important; color: var(--color-success) !important; }
+.badge.bg-warning { background: #FEF3C7 !important; color: var(--color-warning) !important; }
+.badge.bg-info    { background: #DBEAFE !important; color: var(--color-info)    !important; }
+
+/* ── Modales ─────────────────────────────────────────────── */
+.modal-content {
+  border: none !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 8px 30px rgba(0,0,0,.15) !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header.bg-primary { background: var(--color-primary) !important; }
+.modal-header.bg-success { background: var(--color-success) !important; }
+.modal-header.bg-secondary { background: #475569 !important; }
+
+.modal-title { font-size: 0.95rem; font-weight: 700; }
+.modal-body  { padding: 1.25rem; }
+
+.btn-close-white { filter: invert(1); }
+
+/* ── List group ──────────────────────────────────────────── */
+.list-group-item {
+  border-color: var(--border);
+  font-size: 0.875rem;
+  padding: 0.6rem 0.9rem;
+}
+
+/* ── Scrollbar delgado ───────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── Utilidades rápidas ──────────────────────────────────── */
+.text-primary { color: var(--color-primary) !important; }
+.fw-bold { font-weight: 700 !important; }
+.text-muted { color: var(--text-muted) !important; }
+.shadow-sm { box-shadow: var(--shadow) !important; }
