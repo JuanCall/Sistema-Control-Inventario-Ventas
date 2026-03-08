@@ -1,7 +1,10 @@
 import os
-from fastapi import FastAPI, Request, Depends
+from datetime import datetime, timedelta
+from fastapi import FastAPI, Request, Depends, HTTPException, Form
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.routes import router, get_db
@@ -12,7 +15,6 @@ from app.database import engine
 models.Base.metadata.create_all(bind=engine)
 
 # --- RUTAS ABSOLUTAS ---
-# Esto averigua dinámicamente dónde está la carpeta principal del proyecto
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -20,14 +22,15 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 # Inicializamos la aplicación
 app = FastAPI(title="Sistema de Inventario API V2")
 
+# --- SEGURIDAD Y SESIONES ---
+app.add_middleware(SessionMiddleware, secret_key="mancora2026_seguro")
+
 # Le damos la ruta absoluta exacta a FastAPI
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
 app.include_router(router)
-# También usamos la ruta absoluta para los templates por seguridad
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-# --- FUNCIÓN PUENTE (Para que el HTML no se rompa) ---
+# --- FUNCIÓN PUENTE ---
 def preparar_productos_para_html(db: Session):
     productos = db.query(models.Producto).all()
     for p in productos:
@@ -42,9 +45,41 @@ def preparar_productos_para_html(db: Session):
             p.fecha_vencimiento = ""
     return productos
 
-# --- RUTAS WEB ---
+# --- RUTAS DE LOGIN Y LOGOUT ---
+@app.get("/login", tags=["Seguridad"])
+def vista_login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login", tags=["Seguridad"])
+def procesar_login(request: Request, pin: str = Form(...), db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.pin_seguridad == pin, models.Usuario.activo == True).first()
+    if usuario:
+        request.session["usuario_id"] = usuario.id_usuario
+        request.session["nombre"] = usuario.nombre
+        request.session["rol"] = usuario.rol
+        
+        # Si es admin, va al dashboard. Si es cajero, va directo a la caja.
+        if usuario.rol == "admin":
+            return RedirectResponse(url="/", status_code=303)
+        else:
+            return RedirectResponse(url="/punto_venta", status_code=303)
+            
+    return templates.TemplateResponse("login.html", {"request": request, "error": "PIN incorrecto"})
+
+@app.get("/logout", tags=["Seguridad"])
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login")
+
+# --- RUTAS WEB PROTEGIDAS ---
 @app.get("/", tags=["Interfaz Web"])
 def vista_dashboard(request: Request, db: Session = Depends(get_db)):
+    # Protección: Solo el admin puede ver esto
+    if "rol" not in request.session:
+        return RedirectResponse(url="/login")
+    if request.session.get("rol") != "admin":
+        return RedirectResponse(url="/punto_venta")
+
     productos_preparados = preparar_productos_para_html(db)
     
     total_productos = sum(1 for p in productos_preparados if p.activo)
@@ -64,6 +99,13 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
     ganancia_neta = total_ingresos - total_gastos
 
     alertas_stock = [p for p in productos_preparados if p.activo and p.stock_actual < 20][:5]
+
+    # Lógica de Alertas de Vencimiento (Próximos 30 días)
+    fecha_limite = datetime.now() + timedelta(days=30)
+    lotes_por_vencer = db.query(models.Lote).join(models.Producto).filter(
+        models.Lote.activo == True,
+        models.Lote.fecha_vencimiento <= fecha_limite.date()
+    ).order_by(models.Lote.fecha_vencimiento.asc()).all()
 
     ventas_dia = db.query(
         func.strftime('%Y-%m-%d', models.Venta.fecha_hora).label("fecha"),
@@ -85,6 +127,7 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
             "total_gastos": total_gastos,
             "ganancia_neta": ganancia_neta,
             "alertas_stock": alertas_stock,
+            "lotes_por_vencer": lotes_por_vencer, # <-- Pasamos la data al HTML
             "fechas_dia": [v.fecha for v in ventas_dia],
             "totales_dia": [float(v.total) for v in ventas_dia],
             "fechas_mes": [v.fecha for v in ventas_mes],
@@ -94,6 +137,10 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/inventario", tags=["Interfaz Web"])
 def vista_inventario(request: Request, db: Session = Depends(get_db)):
+    # Protección: Solo el admin puede ver el inventario
+    if request.session.get("rol") != "admin":
+        return RedirectResponse(url="/punto_venta")
+
     lista_productos = preparar_productos_para_html(db)
     lista_categorias = db.query(models.Categoria).filter(models.Categoria.activo == True).all()
     
@@ -104,6 +151,10 @@ def vista_inventario(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/punto_venta", tags=["Interfaz Web"])
 def vista_punto_venta(request: Request, db: Session = Depends(get_db)):
+    # Protección: Debe estar logueado (cajero o admin)
+    if "rol" not in request.session:
+        return RedirectResponse(url="/login")
+
     lista_productos = preparar_productos_para_html(db)
     return templates.TemplateResponse(
         "punto_venta.html", 

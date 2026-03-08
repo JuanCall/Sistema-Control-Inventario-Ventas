@@ -18,9 +18,16 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="/">Inicio (Dashboard)</a></li>
+                    {% if request.session.get('rol') == 'admin' %}
+                        <li class="nav-item"><a class="nav-link" href="/">Inicio (Dashboard)</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/inventario">Inventario</a></li>
+                    {% endif %}
+                    
                     <li class="nav-item"><a class="nav-link" href="/punto_venta">Caja Registradora</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/inventario">Inventario</a></li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link text-warning" href="/logout">Cerrar Sesión ({{ request.session.get('nombre') }})</a>
+                    </li>
                 </ul>
             </div>
         </div>
