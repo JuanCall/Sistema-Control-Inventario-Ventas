@@ -154,7 +154,30 @@
             // Preparamos el Modal
             document.getElementById('modalProductoNombre').innerText = productoActual.nombre;
             document.getElementById('cantidad_venta').value = 1;
-            selectTipoVenta.value = 'unidad';
+            
+            // --- LÓGICA INTELIGENTE PARA EL SELECTOR ---
+            selectTipoVenta.innerHTML = ''; // Limpiamos las opciones viejas
+
+            // 1. Siempre mostramos la opción Unidad (si tiene precio)
+            if (productoActual.p_unidad > 0) {
+                selectTipoVenta.add(new Option('Por Unidad', 'unidad'));
+            }
+            
+            // 2. Mostramos Blíster SOLO si se configuró un precio y vienen más de 1 unidad
+            if (productoActual.p_blister > 0 && productoActual.u_blister > 1) {
+                selectTipoVenta.add(new Option('Por Blíster', 'blister'));
+            }
+            
+            // 3. Mostramos Caja SOLO si se configuró un precio y trae más de 1 unidad
+            if (productoActual.p_caja > 0 && productoActual.u_caja > 1) {
+                selectTipoVenta.add(new Option('Por Caja', 'caja'));
+            }
+
+            // Seleccionamos la primera opción disponible por defecto
+            if(selectTipoVenta.options.length > 0) {
+                selectTipoVenta.selectedIndex = 0;
+            }
+
             actualizarPrecioDinamico();
             
             // Abrimos el Modal

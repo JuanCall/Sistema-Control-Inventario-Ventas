@@ -63,6 +63,13 @@ def inhabilitar_categoria(id_categoria: int, db: Session = Depends(get_db)):
     db.commit()
     return {"mensaje": "Categoría inhabilitada"}
 
+@router.put("/categorias/{id_categoria}/habilitar", tags=["Categorias"])
+def habilitar_categoria(id_categoria: int, db: Session = Depends(get_db)):
+    db_cat = db.query(models.Categoria).filter(models.Categoria.id_categoria == id_categoria).first()
+    db_cat.activo = True
+    db.commit()
+    return {"mensaje": "Categoría restaurada"}
+
 # --- RUTAS DE PRODUCTOS Y LOTES ---
 
 # ==========================================
@@ -145,6 +152,13 @@ def inhabilitar_producto(id_producto: int, db: Session = Depends(get_db)):
     db_producto.activo = False
     db.commit()
     return {"mensaje": "Producto inhabilitado"}
+
+@router.put("/productos/{id_producto}/habilitar", tags=["Productos"])
+def habilitar_producto(id_producto: int, db: Session = Depends(get_db)):
+    db_prod = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
+    db_prod.activo = True
+    db.commit()
+    return {"mensaje": "Producto restaurado"}
 
 # --- RUTA DE VENTAS (MÉTODO PEPS / FIFO) ---
 @router.post("/ventas/", tags=["Ventas"])

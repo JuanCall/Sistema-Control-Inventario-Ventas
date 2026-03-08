@@ -137,12 +137,11 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/inventario", tags=["Interfaz Web"])
 def vista_inventario(request: Request, db: Session = Depends(get_db)):
-    # Protección: Solo el admin puede ver el inventario
     if request.session.get("rol") != "admin":
         return RedirectResponse(url="/punto_venta")
 
     lista_productos = preparar_productos_para_html(db)
-    lista_categorias = db.query(models.Categoria).filter(models.Categoria.activo == True).all()
+    lista_categorias = db.query(models.Categoria).all() 
     
     return templates.TemplateResponse(
         "inventario.html", 

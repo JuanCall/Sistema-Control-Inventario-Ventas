@@ -30,9 +30,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for producto in productos if producto.activo %}
-                    <tr>
-                        <td class="fw-bold text-primary">{{ producto.nombre }}</td>
+                    {% for producto in productos %}
+                    
+                    <tr class="{% if not producto.activo %}table-secondary text-muted{% endif %}">
+                        <td class="fw-bold {% if producto.activo %}text-primary{% endif %}">{{ producto.nombre }}</td>
                         <td>
                             {% for cat in categorias if cat.id_categoria == producto.id_categoria %}
                                 {{ cat.nombre }}
@@ -54,15 +55,20 @@
                             {% endif %}
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-outline-info me-1" data-bs-toggle="collapse" data-bs-target="#lotes-{{ producto.id_producto }}">📦 Lotes</button>
-                            <button class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
-                            
-                            <button class="btn btn-sm btn-warning me-1" onclick="abrirModalEditar(
-                                    {{ producto.id_producto }}, '{{ producto.nombre }}', {{ producto.id_categoria }},
-                                    {{ producto.unidades_por_blister }}, {{ producto.unidades_por_caja }},
-                                    {{ producto.precio_unidad }}, {{ producto.precio_blister or 0 }}, {{ producto.precio_caja or 0 }}
-                                )">✏️</button>
-                            <button class="btn btn-sm btn-danger" onclick="inhabilitarProducto({{ producto.id_producto }})">🗑️</button>
+                            {% if producto.activo %}
+                                <button class="btn btn-sm btn-outline-info me-1" data-bs-toggle="collapse" data-bs-target="#lotes-{{ producto.id_producto }}">📦 Lotes</button>
+                                <button class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
+                                
+                                <button class="btn btn-sm btn-warning me-1" onclick="abrirModalEditar(
+                                        {{ producto.id_producto }}, '{{ producto.nombre }}', {{ producto.id_categoria }},
+                                        {{ producto.unidades_por_blister }}, {{ producto.unidades_por_caja }},
+                                        {{ producto.precio_unidad }}, {{ producto.precio_blister or 0 }}, {{ producto.precio_caja or 0 }}
+                                    )">✏️</button>
+                                <button class="btn btn-sm btn-danger" onclick="inhabilitarProducto({{ producto.id_producto }})">🗑️</button>
+                            {% else %}
+                                <span class="badge bg-secondary me-2">Inhabilitado</span>
+                                <button class="btn btn-sm btn-success" onclick="habilitarProducto({{ producto.id_producto }})">🔄 Restaurar</button>
+                            {% endif %}
                         </td>
                     </tr>
                     
@@ -210,10 +216,14 @@
                     <button type="submit" class="btn btn-success">Añadir</button>
                 </form>
                 <ul class="list-group">
-                    {% for cat in categorias if cat.activo %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {% for cat in categorias %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center {% if not cat.activo %}bg-light text-muted{% endif %}">
                         {{ cat.nombre }}
-                        <button class="btn btn-sm btn-outline-danger" onclick="inhabilitarCategoria({{ cat.id_categoria }})">Inhabilitar</button>
+                        {% if cat.activo %}
+                            <button class="btn btn-sm btn-outline-danger" onclick="inhabilitarCategoria({{ cat.id_categoria }})">Inhabilitar</button>
+                        {% else %}
+                            <button class="btn btn-sm btn-success" onclick="habilitarCategoria({{ cat.id_categoria }})">Restaurar</button>
+                        {% endif %}
                     </li>
                     {% endfor %}
                 </ul>
@@ -264,7 +274,7 @@
     window.abrirModalCrear = function() {
         document.getElementById('tituloModalProducto').innerText = "Registrar Nuevo Producto";
         document.getElementById('producto_id').value = "";
-        document.getElementById('seccion_primer_lote').style.display = 'block'; // Mostramos para pedir el lote inicial
+        document.getElementById('seccion_primer_lote').style.display = 'block'; 
         formProducto.reset();
         modalProductoObj.show();
     };
@@ -280,9 +290,7 @@
         document.getElementById('precio_blister').value = p_blister;
         document.getElementById('precio_unidad').value = p_uni;
         
-        // Ocultamos la sección del lote inicial porque los lotes se agregan con el botón "Comprar"
         document.getElementById('seccion_primer_lote').style.display = 'none'; 
-        
         modalProductoObj.show();
     };
 
@@ -301,8 +309,6 @@
             precio_blister: parseFloat(document.getElementById('precio_blister').value) || null,
             precio_caja: parseFloat(document.getElementById('precio_caja').value) || null,
             
-            // Si estamos editando, mandamos ceros "falsos" para no romper el Pydantic Schema de Python. 
-            // FastAPI los ignorará gracias al PUT de routes.py
             cantidad_cajas_inicial: id_producto ? 0 : parseInt(document.getElementById('cantidad_cajas_inicial').value),
             precio_costo_caja: id_producto ? 0 : parseFloat(document.getElementById('precio_costo_caja').value),
             fecha_vencimiento: id_producto ? "2099-01-01" : document.getElementById('fecha_vencimiento').value
@@ -332,6 +338,21 @@
     window.inhabilitarCategoria = async function(id) {
         if(confirm("¿Seguro de inhabilitar esta categoría?")) {
             await fetch(`/categorias/${id}`, { method: 'DELETE' });
+            window.location.reload();
+        }
+    };
+
+    // Funciones para Restaurar (Habilitar)
+    window.habilitarProducto = async function(id) {
+        if(confirm("¿Deseas volver a habilitar este producto para la venta?")) {
+            await fetch(`/productos/${id}/habilitar`, { method: 'PUT' });
+            window.location.reload();
+        }
+    };
+
+    window.habilitarCategoria = async function(id) {
+        if(confirm("¿Deseas volver a habilitar esta categoría?")) {
+            await fetch(`/categorias/${id}/habilitar`, { method: 'PUT' });
             window.location.reload();
         }
     };
