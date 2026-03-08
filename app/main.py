@@ -11,8 +11,8 @@ from app.database import engine
 # Creamos las tablas físicas en la BD
 models.Base.metadata.create_all(bind=engine)
 
-# --- RUTAS ABSOLUTAS (A prueba de fallos) ---
-# Esto averigua dinámicamente dónde está la carpeta principal de tu proyecto
+# --- RUTAS ABSOLUTAS ---
+# Esto averigua dinámicamente dónde está la carpeta principal del proyecto
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")

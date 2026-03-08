@@ -3,6 +3,9 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
 
+# ==========================================
+# TABLA USUARIOS
+# ==========================================
 class Usuario(Base):
     __tablename__ = "Usuarios"
 
@@ -14,6 +17,9 @@ class Usuario(Base):
 
     ventas = relationship("Venta", back_populates="cajero")
 
+# ==========================================
+# TABLA CATEGORIAS
+# ==========================================
 class Categoria(Base):
     __tablename__ = "Categorias"
 
@@ -23,6 +29,9 @@ class Categoria(Base):
 
     productos = relationship("Producto", back_populates="categoria")
 
+# ==========================================
+# TABLA PRODUCTOS
+# ==========================================
 class Producto(Base):
     __tablename__ = "Productos"
 
@@ -30,7 +39,7 @@ class Producto(Base):
     id_categoria = Column(Integer, ForeignKey("Categorias.id_categoria"))
     nombre = Column(String(150), nullable=False)
     
-    # Presentaciones y precios de venta al público (Esto es fijo por producto)
+    # Presentaciones y precios de venta al público
     unidades_por_blister = Column(Integer, default=1)
     unidades_por_caja = Column(Integer, default=1)
     precio_unidad = Column(Float, nullable=False)
@@ -42,11 +51,11 @@ class Producto(Base):
     categoria = relationship("Categoria", back_populates="productos")
     detalles_venta = relationship("DetalleVenta", back_populates="producto")
     
-    # NUEVA RELACIÓN: Un producto puede tener muchos lotes diferentes
+    # Un producto puede tener muchos lotes diferentes
     lotes = relationship("Lote", back_populates="producto")
 
 # ==========================================
-# NUEVA TABLA: LOTES (El corazón de la V2)
+# TABLA LOTES
 # ==========================================
 class Lote(Base):
     __tablename__ = "Lotes"
@@ -56,7 +65,7 @@ class Lote(Base):
     
     # Inventario y Costos específicos de esta compra
     stock_unidades = Column(Integer, nullable=False) # Cuántas pastillas quedan de este lote
-    precio_costo_caja = Column(Float, nullable=False) # Cuánto te costó esta vez
+    precio_costo_caja = Column(Float, nullable=False) # Cuánto costó esta vez
     
     # Fechas clave para el método PEPS (FIFO)
     fecha_ingreso = Column(DateTime, default=datetime.utcnow)
@@ -67,6 +76,9 @@ class Lote(Base):
 
     producto = relationship("Producto", back_populates="lotes")
 
+# ==========================================
+# TABLA VENTAS
+# ==========================================
 class Venta(Base):
     __tablename__ = "Ventas"
 
@@ -78,6 +90,9 @@ class Venta(Base):
     cajero = relationship("Usuario", back_populates="ventas")
     detalles = relationship("DetalleVenta", back_populates="venta")
 
+# ==========================================
+# TABLA DETALLE DE VENTAS
+# ==========================================
 class DetalleVenta(Base):
     __tablename__ = "DetallesVenta"
 

@@ -127,7 +127,7 @@ def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
 
 @router.put("/productos/{id_producto}", tags=["Productos"])
 def actualizar_producto(id_producto: int, producto: ProductoCreate, db: Session = Depends(get_db)):
-    # En V2, Editar un producto solo actualiza sus nombres y precios de venta.
+    # V2: Editar un producto solo actualiza sus nombres y precios de venta.
     db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
     db_producto.id_categoria = producto.id_categoria
     db_producto.nombre = producto.nombre
