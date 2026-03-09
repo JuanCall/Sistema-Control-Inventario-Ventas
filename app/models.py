@@ -37,7 +37,8 @@ class Producto(Base):
 
     id_producto = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_categoria = Column(Integer, ForeignKey("Categorias.id_categoria"))
-    nombre = Column(String(150), nullable=False)
+    codigo_barras = Column(String, unique=True, index=True, nullable=True)
+    nombre = Column(String, index=True)
     
     # Presentaciones y precios de venta al público
     unidades_por_blister = Column(Integer, default=1)
@@ -86,6 +87,7 @@ class Venta(Base):
     id_usuario = Column(Integer, ForeignKey("Usuarios.id_usuario"))
     fecha_hora = Column(DateTime, default=datetime.utcnow)
     total_venta = Column(Float, nullable=False)
+    metodo_pago = Column(String, default="Efectivo")
 
     cajero = relationship("Usuario", back_populates="ventas")
     detalles = relationship("DetalleVenta", back_populates="venta")

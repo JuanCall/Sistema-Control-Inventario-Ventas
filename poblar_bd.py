@@ -1,12 +1,15 @@
 import random
 from datetime import datetime, timedelta
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
 from app import models
+
+# Aseguramos que las tablas existan con las nuevas columnas
+models.Base.metadata.create_all(bind=engine)
 
 # Abrimos conexión directa con tu base de datos
 db = SessionLocal()
 
-print("⏳ Viajando en el tiempo para generar ventas desde Enero 2026...")
+print("⏳ Viajando en el tiempo para generar ventas y yapeos desde Enero 2026...")
 
 def poblar_datos():
     # 1. Crear Cajero de prueba (si no existe)
@@ -28,22 +31,23 @@ def poblar_datos():
             db.refresh(cat)
         cats_db.append(cat)
 
-    # 3. Crear Productos de prueba con sus Lotes Iniciales
+    # 3. Crear Productos con Códigos de Barras Falsos
     productos_data = [
-        {"nombre": "Amoxicilina 500mg", "cat": cats_db[0].id_categoria, "costo": 15.0, "precio": 1.5, "cajas": 5},
-        {"nombre": "Vitamina C + Zinc", "cat": cats_db[1].id_categoria, "costo": 25.0, "precio": 2.5, "cajas": 8},
-        {"nombre": "Alcohol en gel 1L", "cat": cats_db[2].id_categoria, "costo": 10.0, "precio": 18.0, "cajas": 12, "u_caja": 1}
+        {"nombre": "Amoxicilina 500mg", "cat": cats_db[0].id_categoria, "costo": 15.0, "precio": 1.5, "cajas": 5, "codigo": "775001"},
+        {"nombre": "Vitamina C + Zinc", "cat": cats_db[1].id_categoria, "costo": 25.0, "precio": 2.5, "cajas": 8, "codigo": "775002"},
+        {"nombre": "Alcohol en gel 1L", "cat": cats_db[2].id_categoria, "costo": 10.0, "precio": 18.0, "cajas": 12, "u_caja": 1, "codigo": "775003"}
     ]
     
     productos_db = []
     for pd in productos_data:
         prod = db.query(models.Producto).filter_by(nombre=pd["nombre"]).first()
-        u_caja = pd.get("u_caja", 100) # Si no especifica, asumimos caja de 100
+        u_caja = pd.get("u_caja", 100)
         
         if not prod:
             prod = models.Producto(
                 id_categoria=pd["cat"],
                 nombre=pd["nombre"],
+                codigo_barras=pd["codigo"],
                 unidades_por_blister=10 if u_caja > 1 else 1,
                 unidades_por_caja=u_caja,
                 precio_unidad=pd["precio"],
@@ -66,9 +70,9 @@ def poblar_datos():
             db.commit()
         productos_db.append(prod)
 
-    # 4. SIMULAR LAS VENTAS (Del 1 de Enero al 7 de Marzo de 2026)
+    # 4. SIMULAR LAS VENTAS
     fecha_inicio = datetime(2026, 1, 1)
-    fecha_fin = datetime(2026, 3, 7)
+    fecha_fin = datetime(2026, 3, 10)
     dias_totales = (fecha_fin - fecha_inicio).days
     
     ventas_creadas = 0
@@ -76,19 +80,24 @@ def poblar_datos():
     for i in range(dias_totales + 1):
         fecha_actual = fecha_inicio + timedelta(days=i)
         
-        # Simulamos de 1 a 6 ventas aleatorias por día
         for _ in range(random.randint(1, 6)):
-            # Hora aleatoria del día
             hora = random.randint(8, 20)
             minuto = random.randint(0, 59)
             fecha_venta = fecha_actual.replace(hour=hora, minute=minuto)
             
-            nueva_venta = models.Venta(id_usuario=cajero.id_usuario, fecha_hora=fecha_venta, total_venta=0)
+            # MAGIA: 30% de probabilidad de que paguen con Yape, 70% Efectivo
+            metodo = random.choices(["Efectivo", "Yape"], weights=[0.7, 0.3])[0]
+            
+            nueva_venta = models.Venta(
+                id_usuario=cajero.id_usuario, 
+                fecha_hora=fecha_venta, 
+                total_venta=0,
+                metodo_pago=metodo # <-- SE GUARDA EL MÉTODO
+            )
             db.add(nueva_venta)
             db.flush()
             
             total_ticket = 0
-            # Venden de 1 a 3 productos distintos en este ticket
             productos_en_ticket = random.sample(productos_db, random.randint(1, 3))
             
             for p in productos_en_ticket:
@@ -108,7 +117,7 @@ def poblar_datos():
             db.commit()
             ventas_creadas += 1
 
-    print(f"✅ ¡Completado! Se inyectaron {ventas_creadas} ventas falsas en tu base de datos.")
+    print(f"✅ ¡Completado! Se inyectaron {ventas_creadas} ventas falsas (con Efectivo y Yape) en tu base de datos.")
 
 # Ejecutar la función
 poblar_datos()

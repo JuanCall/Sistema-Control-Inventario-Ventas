@@ -10,7 +10,6 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Gestión de Inventario (Farmacia)</h2>
     <div>
-        <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#modalCategorias">⚙️ Categorías</button>
         <button class="btn btn-primary" onclick="abrirModalCrear()">+ Nuevo Producto</button>
     </div>
 </div>
@@ -22,7 +21,6 @@
                 <thead class="table-light">
                     <tr>
                         <th>Producto</th>
-                        <th>Categoría</th>
                         <th>Stock Total</th>
                         <th>Precio (Unid.)</th>
                         <th>Vencimiento Próximo</th>
@@ -34,11 +32,6 @@
                     
                     <tr class="{% if not producto.activo %}table-secondary text-muted{% endif %}">
                         <td class="fw-bold {% if producto.activo %}text-primary{% endif %}">{{ producto.nombre }}</td>
-                        <td>
-                            {% for cat in categorias if cat.id_categoria == producto.id_categoria %}
-                                {{ cat.nombre }}
-                            {% endfor %}
-                        </td>
                         <td>
                             {% if producto.stock_actual < 20 %}
                                 <span class="badge bg-danger">{{ producto.stock_actual }} unid.</span>
@@ -60,10 +53,11 @@
                                 <button class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
                                 
                                 <button class="btn btn-sm btn-warning me-1" onclick="abrirModalEditar(
-                                        {{ producto.id_producto }}, '{{ producto.nombre }}', {{ producto.id_categoria }},
-                                        {{ producto.unidades_por_blister }}, {{ producto.unidades_por_caja }},
-                                        {{ producto.precio_unidad }}, {{ producto.precio_blister or 0 }}, {{ producto.precio_caja or 0 }}
-                                    )">✏️</button>
+                                    {{ producto.id_producto }}, '{{ producto.nombre }}', {{ producto.id_categoria }},
+                                    {{ producto.unidades_por_blister }}, {{ producto.unidades_por_caja }},
+                                    {{ producto.precio_unidad }}, {{ producto.precio_blister or 0 }}, {{ producto.precio_caja or 0 }},
+                                    '{{ producto.codigo_barras or '' }}' 
+                                )">✏️</button>
                                 <button class="btn btn-sm btn-danger" onclick="inhabilitarProducto({{ producto.id_producto }})">🗑️</button>
                             {% else %}
                                 <span class="badge bg-secondary me-2">Inhabilitado</span>
@@ -138,18 +132,14 @@
                 <form id="formProducto">
                     <input type="hidden" id="producto_id">
                     <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label text-primary fw-bold">🎫 Código de Barras (Escanee aquí)</label>
+                            <input type="text" class="form-control border-primary" id="codigo_barras" placeholder="Haga clic aquí y escanee el producto..." autofocus>
+                        </div>
+
                         <div class="col-md-8">
                             <label class="form-label">Nombre del Producto</label>
                             <input type="text" class="form-control" id="nombre" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Categoría</label>
-                            <select class="form-select" id="id_categoria" required>
-                                <option value="">Seleccione...</option>
-                                {% for cat in categorias if cat.activo %}
-                                    <option value="{{ cat.id_categoria }}">{{ cat.nombre }}</option>
-                                {% endfor %}
-                            </select>
                         </div>
 
                         <div class="col-md-6">
@@ -240,6 +230,15 @@
     const formProducto = document.getElementById('formProducto');
     const formNuevoLote = document.getElementById('formNuevoLote');
 
+    // --- LÓGICA DEL LECTOR DE CÓDIGO DE BARRAS ---
+    // Prevenir que el escáner guarde el formulario al presionar "Enter" automáticamente
+    document.getElementById('codigo_barras').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Evita que el formulario se envíe
+            document.getElementById('nombre').focus(); // Salta automáticamente al campo del nombre
+        }
+    });
+
     // --- LÓGICA DE LOTES (NUEVA COMPRA) ---
     window.abrirModalComprar = function(id_producto, nombre_producto) {
         document.getElementById('lote_id_producto').value = id_producto;
@@ -276,12 +275,18 @@
         document.getElementById('producto_id').value = "";
         document.getElementById('seccion_primer_lote').style.display = 'block'; 
         formProducto.reset();
+        
+        // Magia de UI: Ponemos el cursor en el código de barras después de medio segundo (cuando termina la animación del modal)
+        setTimeout(() => document.getElementById('codigo_barras').focus(), 500);
+        
         modalProductoObj.show();
     };
 
-    window.abrirModalEditar = function(id, nombre, id_cat, u_blister, u_caja, p_uni, p_blister, p_caja) {
+    // ACTUALIZADO: Ahora recibe el 'codigo' como último parámetro
+    window.abrirModalEditar = function(id, nombre, id_cat, u_blister, u_caja, p_uni, p_blister, p_caja, codigo) {
         document.getElementById('tituloModalProducto').innerText = "Editar Catálogo del Producto";
         document.getElementById('producto_id').value = id;
+        document.getElementById('codigo_barras').value = codigo || "";
         document.getElementById('nombre').value = nombre;
         document.getElementById('id_categoria').value = id_cat;
         document.getElementById('unidades_por_blister').value = u_blister;
@@ -301,7 +306,8 @@
         const url = id_producto ? `/productos/${id_producto}` : '/productos/';
 
         const productoData = {
-            id_categoria: parseInt(document.getElementById('id_categoria').value),
+            id_categoria: 1,
+            codigo_barras: document.getElementById('codigo_barras').value || null, 
             nombre: document.getElementById('nombre').value,
             unidades_por_blister: parseInt(document.getElementById('unidades_por_blister').value),
             unidades_por_caja: parseInt(document.getElementById('unidades_por_caja').value),

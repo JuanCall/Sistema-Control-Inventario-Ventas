@@ -12,7 +12,7 @@
         <div class="card shadow-sm mb-3">
             <div class="card-body">
                 <h5 class="card-title mb-3">Buscador Rápido</h5>
-                <input type="text" id="buscador" class="form-control mb-3" placeholder="Escribe el nombre del producto..." autofocus>
+                <input type="text" id="buscador" class="form-control mb-3" placeholder="Escribe el nombre o escanea el código..." autofocus>
                 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                     <table class="table table-hover align-middle" id="tablaProductos">
@@ -37,8 +37,8 @@
                                             data-pblister="{{ producto.precio_blister or 0 }}"
                                             data-pcaja="{{ producto.precio_caja or 0 }}"
                                             data-ublister="{{ producto.unidades_por_blister }}"
-                                            data-ucaja="{{ producto.unidades_por_caja }}">
-                                        + Agregar
+                                            data-ucaja="{{ producto.unidades_por_caja }}"
+                                            data-codigo="{{ producto.codigo_barras or '' }}"> + Agregar
                                     </button>
                                 </td>
                             </tr>
@@ -52,6 +52,30 @@
     </div>
 
     <div class="col-md-5">
+        {% if request.session.get('rol') == 'admin' %}
+        <div class="card shadow-sm mb-3 border-info">
+            <div class="card-body bg-light pb-2">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-primary">📊 Cuadre de Caja Diario</h6>
+                    <input type="date" id="filtro_fecha_caja" class="form-control form-control-sm border-primary" style="width: 140px;">
+                </div>
+                <div class="row g-2 text-center mb-2">
+                    <div class="col-6">
+                        <div class="p-2 bg-white border rounded shadow-sm">
+                            <small class="fw-bold text-muted">💵 Efectivo Físico</small><br>
+                            <span id="caja_efectivo" class="fs-5 fw-bold text-success">S/ 0.00</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-white border rounded shadow-sm">
+                            <small class="fw-bold text-muted">📱 Yape / Plin</small><br>
+                            <span id="caja_yape" class="fs-5 fw-bold" style="color: #7c3aed;">S/ 0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <div class="card shadow-sm">
             <div class="card-body bg-light">
                 <h4 class="card-title mb-4">Ticket de Venta</h4>
@@ -60,12 +84,20 @@
                     <li class="list-group-item text-center text-muted">Aún no hay productos en la venta</li>
                 </ul>
 
-                <div class="d-flex justify-content-between fs-4 fw-bold text-primary mb-4">
+                <div class="d-flex justify-content-between fs-4 fw-bold text-primary mb-3">
                     <span>Total:</span>
                     <span id="total_venta">S/ 0.00</span>
                 </div>
 
-                <button class="btn btn-primary w-100 btn-lg" id="btn_cobrar" disabled>Cobrar Venta</button>
+                <div class="mb-4">
+                    <label class="form-label text-muted small fw-bold">Método de Pago</label>
+                    <select id="metodo_pago" class="form-select border-primary bg-white fw-bold">
+                        <option value="Efectivo">💵 Efectivo (Caja)</option>
+                        <option value="Yape">📱 Yape / Plin</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary w-100 btn-lg" id="btn_cobrar" disabled>Cobrar e Imprimir</button>
             </div>
         </div>
     </div>
@@ -82,11 +114,7 @@
                 <form id="formAgregarCarrito">
                     <div class="mb-3">
                         <label class="form-label">Tipo de Venta</label>
-                        <select class="form-select" id="tipo_venta" required>
-                            <option value="unidad">Por Unidad</option>
-                            <option value="blister">Por Blíster</option>
-                            <option value="caja">Por Caja</option>
-                        </select>
+                        <select class="form-select" id="tipo_venta" required></select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Cantidad</label>
@@ -105,42 +133,77 @@
 
 {% block scripts %}
 <script>
-    // Memoria del Punto de Venta
     let carrito = [];
-    let productoActual = {}; // Guardará los datos del producto al que le dimos clic temporalmente
+    // LÓGICA DE CUADRE DE CAJA (SOLO ADMIN)
+    const historialAdmin = {{ historial_ventas | default('[]') | safe }};
+    const filtroCaja = document.getElementById('filtro_fecha_caja');
+
+    if (filtroCaja) {
+        // Poner la fecha de hoy por defecto
+        filtroCaja.value = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+        
+        function calcularCajaDia() {
+            let ef = 0, yp = 0;
+            historialAdmin.forEach(v => {
+                if(v.fecha === filtroCaja.value) {
+                    if(v.metodo === 'Yape') yp += v.ingreso;
+                    else ef += v.ingreso;
+                }
+            });
+            document.getElementById('caja_efectivo').innerText = `S/ ${ef.toFixed(2)}`;
+            document.getElementById('caja_yape').innerText = `S/ ${yp.toFixed(2)}`;
+        }
+
+        filtroCaja.addEventListener('change', calcularCajaDia);
+        calcularCajaDia(); // Calcular al cargar la página
+    }
+
+    let productoActual = {}; 
     
-    // UI Elements
     const carritoUI = document.getElementById('carrito_compras');
     const totalUI = document.getElementById('total_venta');
     const btnCobrar = document.getElementById('btn_cobrar');
     const buscador = document.getElementById('buscador');
     
-    // Modal Elements
     const modalVenta = new bootstrap.Modal(document.getElementById('modalOpcionesVenta'));
     const formAgregar = document.getElementById('formAgregarCarrito');
     const selectTipoVenta = document.getElementById('tipo_venta');
     const labelPrecioDinamico = document.getElementById('precio_dinamico');
 
-    // === BUSCADOR EN TIEMPO REAL ===
-    buscador.addEventListener('keyup', function() {
+    // === BUSCADOR Y LECTOR DE CÓDIGO DE BARRAS ===
+    buscador.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+            const codigoEscaneado = this.value.trim();
+            if (codigoEscaneado === '') return;
+            let productoEncontrado = false;
+            
+            document.querySelectorAll('.btn-pre-agregar').forEach(btn => {
+                if (btn.getAttribute('data-codigo') === codigoEscaneado) {
+                    btn.click();
+                    productoEncontrado = true;
+                }
+            });
+
+            if (productoEncontrado) {
+                this.value = '';
+                document.querySelectorAll('#tablaProductos tbody tr').forEach(fila => fila.style.display = '');
+            } else {
+                alert("Producto no encontrado o código incorrecto.");
+            }
+            return; 
+        }
+
         const filtro = this.value.toLowerCase();
         const filas = document.querySelectorAll('#tablaProductos tbody tr');
-        
         filas.forEach(fila => {
             const textoFila = fila.innerText.toLowerCase();
-            // Si el texto de la fila incluye lo que escribimos, la mostramos, sino la ocultamos
-            if(textoFila.includes(filtro)) {
-                fila.style.display = '';
-            } else {
-                fila.style.display = 'none';
-            }
+            fila.style.display = textoFila.includes(filtro) ? '' : 'none';
         });
     });
 
     // === AL HACER CLIC EN "+ AGREGAR" ===
     document.querySelectorAll('.btn-pre-agregar').forEach(btn => {
         btn.addEventListener('click', function() {
-            // Guardamos todos los datos del botón en nuestra variable temporal
             productoActual = {
                 id: parseInt(this.getAttribute('data-id')),
                 nombre: this.getAttribute('data-nombre'),
@@ -151,41 +214,25 @@
                 u_caja: parseInt(this.getAttribute('data-ucaja'))
             };
 
-            // Preparamos el Modal
             document.getElementById('modalProductoNombre').innerText = productoActual.nombre;
             document.getElementById('cantidad_venta').value = 1;
             
-            // --- LÓGICA INTELIGENTE PARA EL SELECTOR ---
-            selectTipoVenta.innerHTML = ''; // Limpiamos las opciones viejas
+            selectTipoVenta.innerHTML = ''; 
+            if (productoActual.p_unidad > 0) selectTipoVenta.add(new Option('Por Unidad', 'unidad'));
+            if (productoActual.p_blister > 0 && productoActual.u_blister > 1) selectTipoVenta.add(new Option('Por Blíster', 'blister'));
+            if (productoActual.p_caja > 0 && productoActual.u_caja > 1) selectTipoVenta.add(new Option('Por Caja', 'caja'));
 
-            // 1. Siempre mostramos la opción Unidad (si tiene precio)
-            if (productoActual.p_unidad > 0) {
-                selectTipoVenta.add(new Option('Por Unidad', 'unidad'));
-            }
-            
-            // 2. Mostramos Blíster SOLO si se configuró un precio y vienen más de 1 unidad
-            if (productoActual.p_blister > 0 && productoActual.u_blister > 1) {
-                selectTipoVenta.add(new Option('Por Blíster', 'blister'));
-            }
-            
-            // 3. Mostramos Caja SOLO si se configuró un precio y trae más de 1 unidad
-            if (productoActual.p_caja > 0 && productoActual.u_caja > 1) {
-                selectTipoVenta.add(new Option('Por Caja', 'caja'));
-            }
-
-            // Seleccionamos la primera opción disponible por defecto
-            if(selectTipoVenta.options.length > 0) {
-                selectTipoVenta.selectedIndex = 0;
-            }
-
+            if(selectTipoVenta.options.length > 0) selectTipoVenta.selectedIndex = 0;
             actualizarPrecioDinamico();
             
-            // Abrimos el Modal
             modalVenta.show();
+            setTimeout(() => {
+                document.getElementById('cantidad_venta').focus();
+                document.getElementById('cantidad_venta').select();
+            }, 500);
         });
     });
 
-    // Actualizar el texto del precio cuando cambiamos de unidad a caja
     selectTipoVenta.addEventListener('change', actualizarPrecioDinamico);
     function actualizarPrecioDinamico() {
         let precio = 0;
@@ -195,30 +242,17 @@
         labelPrecioDinamico.innerText = `S/ ${precio.toFixed(2)}`;
     }
 
-    // === AL CONFIRMAR LA CANTIDAD EN EL MODAL ===
     formAgregar.addEventListener('submit', function(e) {
         e.preventDefault();
-        
         const tipo = selectTipoVenta.value;
         const cantidadInput = parseInt(document.getElementById('cantidad_venta').value);
-        
-        let precioCobrado = 0;
-        let unidadesRealesARestar = 0;
+        let precioCobrado = 0, unidadesRealesARestar = 0;
         let etiquetaNombre = `${productoActual.nombre} (${tipo})`;
 
-        // Matemáticas lógicas según el tipo
-        if (tipo === 'unidad') {
-            precioCobrado = productoActual.p_unidad;
-            unidadesRealesARestar = cantidadInput; // 1 unidad = 1 stock
-        } else if (tipo === 'blister') {
-            precioCobrado = productoActual.p_blister;
-            unidadesRealesARestar = cantidadInput * productoActual.u_blister; // 2 blisters * 10 = 20 stock
-        } else if (tipo === 'caja') {
-            precioCobrado = productoActual.p_caja;
-            unidadesRealesARestar = cantidadInput * productoActual.u_caja; // 1 caja * 100 = 100 stock
-        }
+        if (tipo === 'unidad') { precioCobrado = productoActual.p_unidad; unidadesRealesARestar = cantidadInput; } 
+        else if (tipo === 'blister') { precioCobrado = productoActual.p_blister; unidadesRealesARestar = cantidadInput * productoActual.u_blister; } 
+        else if (tipo === 'caja') { precioCobrado = productoActual.p_caja; unidadesRealesARestar = cantidadInput * productoActual.u_caja; }
 
-        // Revisamos si el producto ya está en el ticket (con la misma presentación)
         const itemExistente = carrito.find(item => item.id_producto === productoActual.id && item.tipo === tipo);
         
         if (itemExistente) {
@@ -230,29 +264,26 @@
                 id_producto: productoActual.id,
                 nombre_display: etiquetaNombre,
                 tipo: tipo,
-                cantidad_input: cantidadInput, // Lo que ve el cajero (ej. 2 blisters)
-                unidades_restar: unidadesRealesARestar, // Lo que Python restará (ej. 20 unidades)
+                cantidad_input: cantidadInput, 
+                unidades_restar: unidadesRealesARestar, 
                 precio_cobrado: precioCobrado,
                 subtotal: cantidadInput * precioCobrado
             });
         }
-        
         actualizarTicket();
-        modalVenta.hide(); // Cerramos la ventana
+        modalVenta.hide(); 
+        setTimeout(() => buscador.focus(), 500);
     });
 
-    // === FUNCIONES DEL TICKET (Igual que antes pero usando nuestros nuevos datos) ===
     function actualizarTicket() {
         carritoUI.innerHTML = ''; 
         let total = 0;
-
         if (carrito.length === 0) {
             carritoUI.innerHTML = '<li class="list-group-item text-center text-muted">Aún no hay productos en la venta</li>';
             btnCobrar.disabled = true;
             totalUI.innerText = 'S/ 0.00';
             return;
         }
-
         carrito.forEach((item, index) => {
             total += item.subtotal;
             carritoUI.innerHTML += `
@@ -268,7 +299,6 @@
                 </li>
             `;
         });
-
         totalUI.innerText = `S/ ${total.toFixed(2)}`;
         btnCobrar.disabled = false;
     }
@@ -278,29 +308,68 @@
         actualizarTicket();
     };
 
+    // === NUEVA FUNCIÓN: IMPRIMIR TICKET TÉRMICO ===
+    function imprimirTicket(carritoDatos, total, metodo) {
+        const fecha = new Date().toLocaleString('es-PE');
+        let ventana = window.open('', 'Imprimir Ticket', 'width=400,height=600');
+        
+        let html = `
+        <html><head>
+        <style>
+            body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 10px; width: 58mm; color: #000; }
+            h3 { text-align: center; margin: 0 0 5px 0; font-size: 15px; }
+            .centro { text-align: center; }
+            .derecha { text-align: right; }
+            .linea { border-bottom: 1px dashed #000; margin: 5px 0; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            td { padding: 3px 0; vertical-align: top; }
+            .total { font-weight: bold; font-size: 14px; margin-top: 5px; }
+        </style>
+        </head><body>
+            <h3>BOTICA -----</h3>
+            <div class="centro">Máncora - Piura<br>Ticket de Venta<br>${fecha}</div>
+            <div class="linea"></div>
+            <table>
+                <tr><td><b>Cant. Prod.</b></td><td class="derecha"><b>Importe</b></td></tr>
+        `;
+        
+        carritoDatos.forEach(item => {
+            html += `<tr><td>${item.cantidad_input}x ${item.nombre_display}</td><td class="derecha">S/ ${item.subtotal.toFixed(2)}</td></tr>`;
+        });
+        
+        html += `
+            </table>
+            <div class="linea"></div>
+            <div class="derecha total">TOTAL: S/ ${total.toFixed(2)}</div>
+            <div class="derecha">Pago con: <b>${metodo}</b></div>
+            <div class="linea"></div>
+            <div class="centro"><br>¡Gracias por su preferencia!<br>Vuelva pronto</div>
+        </body></html>
+        `;
+        
+        ventana.document.write(html);
+        ventana.document.close();
+        ventana.focus();
+        ventana.print(); 
+        ventana.close();
+    }
+
     // === ENVIAR VENTA AL SERVIDOR ===
     btnCobrar.addEventListener('click', async () => {
-        // Armamos el paquete. Python SOLO necesita saber cuántas unidades REALES restar.
-        // Convertimos todo a "unidades base" para mandarlo a FastApi.
-        
+        const metodoSeleccionado = document.getElementById('metodo_pago').value;
+        const totalVenta = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+
         let detallesUnificados = [];
-        
         carrito.forEach(item => {
-            // Si el mismo producto se cobró en blíster y unidad, los sumamos para Python
             let existente = detallesUnificados.find(d => d.id_producto === item.id_producto);
-            if (existente) {
-                existente.cantidad += item.unidades_restar;
-            } else {
-                detallesUnificados.push({
-                    id_producto: item.id_producto,
-                    cantidad: item.unidades_restar
-                });
-            }
+            if (existente) existente.cantidad += item.unidades_restar;
+            else detallesUnificados.push({ id_producto: item.id_producto, cantidad: item.unidades_restar });
         });
 
         const payload = {
             id_usuario: 1, 
-            detalles: detallesUnificados
+            detalles: detallesUnificados,
+            metodo_pago: metodoSeleccionado // <-- Enviamos el método de pago
         };
 
         const response = await fetch('/ventas/', {
@@ -310,7 +379,9 @@
         });
 
         if (response.ok) {
-            alert('¡Venta registrada! El stock se ha restado correctamente.');
+            // Imprimimos el ticket antes de recargar
+            imprimirTicket(carrito, totalVenta, metodoSeleccionado);
+            alert('¡Venta registrada exitosamente!');
             window.location.reload(); 
         } else {
             alert('Error al registrar la venta. Verifica el stock.');

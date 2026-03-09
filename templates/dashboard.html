@@ -8,44 +8,44 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Panel de Control</h2>
-    <p class="text-muted mb-0">Resumen financiero y operativo en tiempo real</p>
+    <h2>Panel de Control Directivo</h2>
+    <p class="text-muted mb-0">Resumen financiero y operativo dinámico</p>
 </div>
 
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card shadow-sm text-white bg-primary mb-3 h-100">
+        <div class="card shadow-sm text-white bg-primary mb-3 h-100 border-0">
             <div class="card-body">
-                <h6 class="card-title fw-light">Ingresos Totales</h6>
-                <h3 class="fw-bold">S/ {{ "%.2f"|format(total_ingresos) }}</h3>
+                <h6 class="card-title fw-light text-uppercase">Ingresos Totales</h6>
+                <h3 class="fw-bold mb-0" id="ui_ingresos">S/ 0.00</h3>
                 <small>Ventas brutas</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card shadow-sm text-white bg-danger mb-3 h-100">
+        <div class="card shadow-sm text-white bg-danger mb-3 h-100 border-0">
             <div class="card-body">
-                <h6 class="card-title fw-light">Costo de Ventas</h6>
-                <h3 class="fw-bold">S/ {{ "%.2f"|format(total_gastos) }}</h3>
+                <h6 class="card-title fw-light text-uppercase">Costo de Venta</h6>
+                <h3 class="fw-bold mb-0" id="ui_costos">S/ 0.00</h3>
                 <small>Mercadería vendida</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card shadow-sm text-white bg-success mb-3 h-100">
+        <div class="card shadow-sm text-white bg-success mb-3 h-100 border-0">
             <div class="card-body">
-                <h6 class="card-title fw-light">Utilidad Neta</h6>
-                <h3 class="fw-bold">S/ {{ "%.2f"|format(ganancia_neta) }}</h3>
-                <small>Tu ganancia real</small>
+                <h6 class="card-title fw-light text-uppercase">Utilidad Neta</h6>
+                <h3 class="fw-bold mb-0" id="ui_utilidad">S/ 0.00</h3>
+                <small>Ganancia real</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card shadow-sm text-dark bg-warning mb-3 h-100">
+        <div class="card shadow-sm text-dark bg-warning mb-3 h-100 border-0">
             <div class="card-body">
-                <h6 class="card-title fw-light">Alertas de Stock</h6>
-                <h3 class="fw-bold">{{ productos_bajo_stock }} <span class="fs-6 fw-normal">prod.</span></h3>
-                <small>Por agotarse (< 20)</small>
+                <h6 class="card-title fw-light text-uppercase">Alertas Activas</h6>
+                <h3 class="fw-bold mb-0">{{ alertas_stock|length + lotes_por_vencer|length }}</h3>
+                <small class="text-dark-50">Requieren revisión</small>
             </div>
         </div>
     </div>
@@ -53,9 +53,9 @@
 
 <div class="row">
     <div class="col-md-4">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 text-danger fw-bold fs-6">⚠️ Atención Requerida</h5>
+        <div class="card shadow-sm mb-4 border-danger">
+            <div class="card-header bg-danger text-dark">
+                <h5 class="mb-0 fw-bold fs-6">⚠️ Stock Crítico (Menos de 20)</h5>
             </div>
             <ul class="list-group list-group-flush">
                 {% if alertas_stock %}
@@ -72,15 +72,15 @@
         </div>
 
         <div class="card shadow-sm mb-4 border-warning">
-            <div class="card-header bg-warning text-white">
-                <h5 class="mb-0 fs-6">⏰ Vencimientos (30 días)</h5>
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0 fs-6 fw-bold">⏰ Vencimientos (Próx. 30 días)</h5>
             </div>
             <ul class="list-group list-group-flush">
                 {% if lotes_por_vencer %}
                     {% for lote in lotes_por_vencer %}
                     <li class="list-group-item">
                         <div class="d-flex justify-content-between align-items-start">
-                            <span class="fw-bold text-truncate" style="max-width: 140px;">{{ lote.producto.nombre }}</span>
+                            <span class="fw-bold text-truncate" style="max-width: 140px;" title="{{ lote.producto.nombre }}">{{ lote.producto.nombre }}</span>
                             <span class="badge bg-danger">Vence: {{ lote.fecha_vencimiento }}</span>
                         </div>
                         <small class="text-muted">Quedan {{ lote.stock_unidades }} unid.</small>
@@ -99,17 +99,17 @@
                 <h5 class="mb-0 text-primary fw-bold">📈 Evolución de Ingresos</h5>
                 
                 <div class="d-flex gap-2">
-                    <select id="tipoFiltro" class="form-select form-select-sm w-auto">
+                    <select id="tipoFiltro" class="form-select form-select-sm w-auto fw-bold text-primary border-primary">
                         <option value="mes">Ver por Mes</option>
                         <option value="ano">Ver por Año</option>
                     </select>
-                    <select id="selectorPeriodo" class="form-select form-select-sm w-auto">
+                    <select id="selectorPeriodo" class="form-select form-select-sm w-auto bg-light">
                         </select>
                 </div>
             </div>
             
             <div class="card-body">
-                <canvas id="graficaVentas" style="max-height: 280px;"></canvas>
+                <canvas id="graficaVentas" style="max-height: 350px;"></canvas>
             </div>
         </div>
     </div>
@@ -120,109 +120,95 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    // 1. Datos puros desde Python
-    const datosPorDia = { fechas: {{ fechas_dia | safe }}, totales: {{ totales_dia | safe }} };
-    const datosPorMes = { fechas: {{ fechas_mes | safe }}, totales: {{ totales_mes | safe }} };
+    // 1. Recibimos la data cruda desde Python
+    const historial = {{ historial_ventas | safe }};
 
-    // Diccionario para que los meses se vean bonitos
+    // Diccionario para meses
     const nombresMeses = { '01':'Ene', '02':'Feb', '03':'Mar', '04':'Abr', '05':'May', '06':'Jun', '07':'Jul', '08':'Ago', '09':'Sep', '10':'Oct', '11':'Nov', '12':'Dic' };
 
-    // 2. Extraer los meses y años que realmente existen en la base de datos
-    const mesesDisponibles = [...new Set(datosPorMes.fechas)]; // Ej: ["2026-01", "2026-02"]
-    const anosDisponibles = [...new Set(datosPorMes.fechas.map(f => f.split('-')[0]))]; // Ej: ["2026"]
+    // 2. Extraer Meses y Años únicos que existen en la historia
+    const mesesSet = new Set();
+    const anosSet = new Set();
+    
+    historial.forEach(v => {
+        const partes = v.fecha.split('-'); // ["2026", "03", "09"]
+        mesesSet.add(`${partes[0]}-${partes[1]}`); // Ej: "2026-03"
+        anosSet.add(partes[0]); // Ej: "2026"
+    });
+    
+    // Convertimos a array y ordenamos para que el más nuevo salga al final
+    const mesesDisponibles = [...mesesSet].sort();
+    const anosDisponibles = [...anosSet].sort();
 
-    // 3. Elementos de la UI
+    // 3. UI Elements
     const tipoFiltro = document.getElementById('tipoFiltro');
     const selectorPeriodo = document.getElementById('selectorPeriodo');
     const ctx = document.getElementById('graficaVentas').getContext('2d');
 
-    // 4. Inicializar la Gráfica de Líneas
+    // 4. Inicializar la Gráfica vacía
     let miGrafica = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Ingresos (S/)',
-                data: [],
-                backgroundColor: 'rgba(13, 110, 253, 0.15)', // Fondo semitransparente debajo de la línea
-                borderColor: 'rgba(13, 110, 253, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(13, 110, 253, 1)',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true,
-                tension: 0.3 // Hace que la línea sea curva y suave
-            }]
-        },
+        data: { labels: [], datasets: [{
+            label: 'Ingresos (S/)', data: [],
+            backgroundColor: 'rgba(13, 110, 253, 0.15)', borderColor: 'rgba(13, 110, 253, 1)',
+            borderWidth: 2, pointBackgroundColor: '#fff', pointBorderColor: 'rgba(13, 110, 253, 1)',
+            pointRadius: 4, pointHoverRadius: 6, fill: true, tension: 0.3
+        }]},
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, ticks: { callback: function(value) { return 'S/ ' + value; } } }
-            },
-            plugins: {
-                tooltip: { callbacks: { label: function(context) { return ' S/ ' + context.parsed.y.toFixed(2); } } }
-            }
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return 'S/ ' + value; } } } },
+            plugins: { tooltip: { callbacks: { label: function(context) { return ' S/ ' + context.parsed.y.toFixed(2); } } } }
         }
     });
 
-    // 5. Función para actualizar el menú desplegable (Ej: Mostrar "2026-01" o "2026")
+    // 5. Llenar el selector secundario (Ej: Ene 2026, Feb 2026...)
     function actualizarOpciones() {
         selectorPeriodo.innerHTML = '';
-        
         if (tipoFiltro.value === 'mes') {
             mesesDisponibles.forEach(m => {
                 let partes = m.split('-');
-                let texto = nombresMeses[partes[1]] + ' ' + partes[0]; // Ej: "Ene 2026"
-                selectorPeriodo.add(new Option(texto, m));
+                selectorPeriodo.add(new Option(`${nombresMeses[partes[1]]} ${partes[0]}`, m));
             });
-            if(mesesDisponibles.length > 0) selectorPeriodo.value = mesesDisponibles[mesesDisponibles.length - 1]; // Seleccionar el más reciente
+            if(mesesDisponibles.length > 0) selectorPeriodo.value = mesesDisponibles[mesesDisponibles.length - 1];
         } else {
-            anosDisponibles.forEach(a => {
-                selectorPeriodo.add(new Option(a, a));
-            });
+            anosDisponibles.forEach(a => selectorPeriodo.add(new Option(a, a)));
             if(anosDisponibles.length > 0) selectorPeriodo.value = anosDisponibles[anosDisponibles.length - 1];
         }
-        
-        actualizarGrafica();
+        actualizarDashboard(); // Llamamos al motor de cálculo
     }
 
-    // 6. Función para filtrar los datos y redibujar la gráfica
-    function actualizarGrafica() {
-        const periodoFiltro = selectorPeriodo.value;
-        let labelsFiltrados = [];
-        let datosFiltrados = [];
+    // 6. EL MOTOR MÁGICO: Calcula Totales y Dibuja la Gráfica en tiempo real
+    function actualizarDashboard() {
+        const periodoFiltro = selectorPeriodo.value; 
+        let kpi = { ingresos: 0, costos: 0 };
+        let datosAgrupados = {};
 
-        if (tipoFiltro.value === 'mes') {
-            // Buscamos los días que pertenezcan a ese mes (Ej: Todo lo que empiece por "2026-03")
-            datosPorDia.fechas.forEach((fecha, index) => {
-                if (fecha.startsWith(periodoFiltro)) {
-                    labelsFiltrados.push(fecha.split('-')[2]); // Eje X: Solo el día ("01", "02", etc)
-                    datosFiltrados.push(datosPorDia.totales[index]); // Eje Y: Dinero
-                }
-            });
-            miGrafica.data.datasets[0].label = 'Ingresos Diarios (S/)';
-        } else {
-            // Buscamos los meses que pertenezcan a ese año (Ej: Todo lo que empiece por "2026")
-            datosPorMes.fechas.forEach((fecha, index) => {
-                if (fecha.startsWith(periodoFiltro)) {
-                    let mes = fecha.split('-')[1];
-                    labelsFiltrados.push(nombresMeses[mes]); // Eje X: Mes ("Ene", "Feb", etc)
-                    datosFiltrados.push(datosPorMes.totales[index]); // Eje Y: Dinero
-                }
-            });
-            miGrafica.data.datasets[0].label = 'Ingresos Mensuales (S/)';
-        }
+        historial.forEach(v => {
+            if (v.fecha.startsWith(periodoFiltro)) {
+                kpi.ingresos += v.ingreso;
+                kpi.costos += v.costo;
 
-        // Le pasamos los datos filtrados a la gráfica y la animamos
-        miGrafica.data.labels = labelsFiltrados;
-        miGrafica.data.datasets[0].data = datosFiltrados;
+                let claveOrden = tipoFiltro.value === 'mes' ? v.fecha.split('-')[2] : v.fecha.split('-')[1];
+                let etiquetaMostrar = tipoFiltro.value === 'mes' ? claveOrden : nombresMeses[claveOrden];
+
+                if (!datosAgrupados[claveOrden]) datosAgrupados[claveOrden] = { etiqueta: etiquetaMostrar, total: 0 };
+                datosAgrupados[claveOrden].total += v.ingreso;
+            }
+        });
+
+        document.getElementById('ui_ingresos').innerText = `S/ ${kpi.ingresos.toFixed(2)}`;
+        document.getElementById('ui_costos').innerText = `S/ ${kpi.costos.toFixed(2)}`;
+        document.getElementById('ui_utilidad').innerText = `S/ ${(kpi.ingresos - kpi.costos).toFixed(2)}`;
+
+        const clavesOrdenadas = Object.keys(datosAgrupados).sort();
+        miGrafica.data.labels = clavesOrdenadas.map(c => datosAgrupados[c].etiqueta);
+        miGrafica.data.datasets[0].data = clavesOrdenadas.map(c => datosAgrupados[c].total);
         miGrafica.update();
     }
 
-    // 7. Eventos: Si cambian los selectores, ejecutar las funciones
+    // 7. Listeners de cambio
     tipoFiltro.addEventListener('change', actualizarOpciones);
-    selectorPeriodo.addEventListener('change', actualizarGrafica);
+    selectorPeriodo.addEventListener('change', actualizarDashboard);
 
     // Arrancar la primera vez
     actualizarOpciones();

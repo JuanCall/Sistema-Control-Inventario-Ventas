@@ -74,7 +74,6 @@ def logout(request: Request):
 # --- RUTAS WEB PROTEGIDAS ---
 @app.get("/", tags=["Interfaz Web"])
 def vista_dashboard(request: Request, db: Session = Depends(get_db)):
-    # Protección: Solo el admin puede ver esto
     if "rol" not in request.session:
         return RedirectResponse(url="/login")
     if request.session.get("rol") != "admin":
@@ -84,38 +83,31 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
     
     total_productos = sum(1 for p in productos_preparados if p.activo)
     productos_bajo_stock = sum(1 for p in productos_preparados if p.activo and p.stock_actual < 20)
-    
-    ventas = db.query(models.Venta).all()
-    total_ingresos = sum(venta.total_venta for venta in ventas)
-
-    detalles_vendidos = db.query(models.DetalleVenta).all()
-    total_gastos = 0
-    for detalle in detalles_vendidos:
-        producto = next((p for p in productos_preparados if p.id_producto == detalle.id_producto), None)
-        if producto and getattr(producto, 'unidades_por_caja', 0) > 0 and getattr(producto, 'precio_costo_caja', 0):
-            costo_por_unidad = producto.precio_costo_caja / producto.unidades_por_caja
-            total_gastos += (costo_por_unidad * detalle.cantidad_unidades)
-            
-    ganancia_neta = total_ingresos - total_gastos
-
     alertas_stock = [p for p in productos_preparados if p.activo and p.stock_actual < 20][:5]
 
-    # Lógica de Alertas de Vencimiento (Próximos 30 días)
     fecha_limite = datetime.now() + timedelta(days=30)
     lotes_por_vencer = db.query(models.Lote).join(models.Producto).filter(
         models.Lote.activo == True,
         models.Lote.fecha_vencimiento <= fecha_limite.date()
     ).order_by(models.Lote.fecha_vencimiento.asc()).all()
 
-    ventas_dia = db.query(
-        func.strftime('%Y-%m-%d', models.Venta.fecha_hora).label("fecha"),
-        func.sum(models.Venta.total_venta).label("total")
-    ).group_by(func.strftime('%Y-%m-%d', models.Venta.fecha_hora)).all()
-
-    ventas_mes = db.query(
-        func.strftime('%Y-%m', models.Venta.fecha_hora).label("fecha"),
-        func.sum(models.Venta.total_venta).label("total")
-    ).group_by(func.strftime('%Y-%m', models.Venta.fecha_hora)).all()
+    # --- EXTRAER TODA LA DATA CRUDA ---
+    ventas = db.query(models.Venta).all()
+    historial_ventas = []
+    
+    for v in ventas:
+        costo_venta = 0
+        for d in v.detalles:
+            prod = next((p for p in productos_preparados if p.id_producto == d.id_producto), None)
+            if prod and getattr(prod, 'unidades_por_caja', 0) > 0:
+                costo_venta += (prod.precio_costo_caja / prod.unidades_por_caja) * d.cantidad_unidades
+                
+        historial_ventas.append({
+            "fecha": v.fecha_hora.strftime("%Y-%m-%d"), 
+            "ingreso": float(v.total_venta),
+            "costo": float(costo_venta),
+            "metodo": getattr(v, 'metodo_pago', 'Efectivo') or 'Efectivo'
+        })
 
     return templates.TemplateResponse(
         "dashboard.html",
@@ -123,15 +115,9 @@ def vista_dashboard(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "total_productos": total_productos,
             "productos_bajo_stock": productos_bajo_stock,
-            "total_ingresos": total_ingresos,
-            "total_gastos": total_gastos,
-            "ganancia_neta": ganancia_neta,
             "alertas_stock": alertas_stock,
-            "lotes_por_vencer": lotes_por_vencer, # <-- Pasamos la data al HTML
-            "fechas_dia": [v.fecha for v in ventas_dia],
-            "totales_dia": [float(v.total) for v in ventas_dia],
-            "fechas_mes": [v.fecha for v in ventas_mes],
-            "totales_mes": [float(v.total) for v in ventas_mes]
+            "lotes_por_vencer": lotes_por_vencer,
+            "historial_ventas": historial_ventas
         }
     )
 
@@ -150,12 +136,27 @@ def vista_inventario(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/punto_venta", tags=["Interfaz Web"])
 def vista_punto_venta(request: Request, db: Session = Depends(get_db)):
-    # Protección: Debe estar logueado (cajero o admin)
     if "rol" not in request.session:
         return RedirectResponse(url="/login")
 
     lista_productos = preparar_productos_para_html(db)
+    
+    # Si es la dueña, le mandamos las ventas para su cuadre de caja
+    historial_ventas = []
+    if request.session.get("rol") == "admin":
+        ventas = db.query(models.Venta).all()
+        for v in ventas:
+            historial_ventas.append({
+                "fecha": v.fecha_hora.strftime("%Y-%m-%d"),
+                "ingreso": float(v.total_venta),
+                "metodo": getattr(v, 'metodo_pago', 'Efectivo') or 'Efectivo'
+            })
+
     return templates.TemplateResponse(
         "punto_venta.html", 
-        {"request": request, "productos": lista_productos}
+        {
+            "request": request, 
+            "productos": lista_productos,
+            "historial_ventas": historial_ventas # <-- Pasamos la data
+        }
     )

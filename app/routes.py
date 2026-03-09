@@ -42,6 +42,7 @@ class DetalleVentaCreate(BaseModel):
 class VentaCreate(BaseModel):
     id_usuario: int = 1
     detalles: List[DetalleVentaCreate]
+    metodo_pago: str = "Efectivo"
 
 # --- RUTAS DE CATEGORÍAS ---
 @router.post("/categorias/", tags=["Categorías"])
@@ -164,14 +165,18 @@ def habilitar_producto(id_producto: int, db: Session = Depends(get_db)):
 @router.post("/ventas/", tags=["Ventas"])
 def registrar_venta(venta: VentaCreate, db: Session = Depends(get_db)):
     total_venta = 0
-    nueva_venta = models.Venta(id_usuario=venta.id_usuario, total_venta=0)
+    # NUEVO: Guardamos el método de pago en la base de datos
+    nueva_venta = models.Venta(
+        id_usuario=venta.id_usuario, 
+        total_venta=0, 
+        metodo_pago=venta.metodo_pago 
+    )
     db.add(nueva_venta)
     db.flush() 
     
     for item in venta.detalles:
         producto_db = db.query(models.Producto).filter(models.Producto.id_producto == item.id_producto).first()
         
-        # Obtenemos TODOS los lotes activos de este producto, ordenados por fecha de vencimiento (el más viejo primero)
         lotes_activos = db.query(models.Lote).filter(
             models.Lote.id_producto == item.id_producto,
             models.Lote.activo == True
@@ -184,22 +189,19 @@ def registrar_venta(venta: VentaCreate, db: Session = Depends(get_db)):
             
         unidades_a_descontar = item.cantidad
         
-        # ALGORITMO PEPS: Descontamos lote por lote
+        # ALGORITMO PEPS
         for lote in lotes_activos:
             if unidades_a_descontar <= 0:
                 break
                 
             if lote.stock_unidades <= unidades_a_descontar:
-                # Vaciamos este lote por completo
                 unidades_a_descontar -= lote.stock_unidades
                 lote.stock_unidades = 0
-                lote.activo = False # El lote murió
+                lote.activo = False 
             else:
-                # El lote tiene suficientes para cubrir lo que falta
                 lote.stock_unidades -= unidades_a_descontar
                 unidades_a_descontar = 0
                 
-        # Calculamos ingresos
         subtotal_item = producto_db.precio_unidad * item.cantidad
         total_venta += subtotal_item
         
@@ -213,4 +215,4 @@ def registrar_venta(venta: VentaCreate, db: Session = Depends(get_db)):
         
     nueva_venta.total_venta = total_venta
     db.commit()
-    return {"mensaje": "Venta exitosa con descuento PEPS", "total": total_venta}
+    return {"mensaje": "Venta exitosa", "total": total_venta}
