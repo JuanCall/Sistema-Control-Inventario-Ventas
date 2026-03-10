@@ -282,13 +282,11 @@
         modalProductoObj.show();
     };
 
-    // ACTUALIZADO: Ahora recibe el 'codigo' como último parámetro
     window.abrirModalEditar = function(id, nombre, id_cat, u_blister, u_caja, p_uni, p_blister, p_caja, codigo) {
         document.getElementById('tituloModalProducto').innerText = "Editar Catálogo del Producto";
         document.getElementById('producto_id').value = id;
         document.getElementById('codigo_barras').value = codigo || "";
         document.getElementById('nombre').value = nombre;
-        document.getElementById('id_categoria').value = id_cat;
         document.getElementById('unidades_por_blister').value = u_blister;
         document.getElementById('unidades_por_caja').value = u_caja;
         document.getElementById('precio_caja').value = p_caja;
