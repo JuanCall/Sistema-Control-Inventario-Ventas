@@ -225,17 +225,36 @@
 
 {% block scripts %}
 <script>
+    // 1. CARGAMOS LA MEMORIA DE PRODUCTOS PARA EVITAR DUPLICADOS
+    const productosExistentes = [
+        {% for p in productos %}
+        { id: {{ p.id_producto }}, nombre: "{{ p.nombre }}", codigo: "{{ p.codigo_barras or '' }}" },
+        {% endfor %}
+    ];
+
     const modalProductoObj = new bootstrap.Modal(document.getElementById('modalProducto'));
     const modalLoteObj = new bootstrap.Modal(document.getElementById('modalNuevoLote'));
     const formProducto = document.getElementById('formProducto');
     const formNuevoLote = document.getElementById('formNuevoLote');
 
-    // --- LÓGICA DEL LECTOR DE CÓDIGO DE BARRAS ---
-    // Prevenir que el escáner guarde el formulario al presionar "Enter" automáticamente
+    // --- LÓGICA DEL LECTOR DE CÓDIGO DE BARRAS (100% OFFLINE + ANTIDUPLICADOS) ---
     document.getElementById('codigo_barras').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            e.preventDefault(); // Evita que el formulario se envíe
-            document.getElementById('nombre').focus(); // Salta automáticamente al campo del nombre
+            e.preventDefault(); 
+            const codigoEscaneado = this.value.trim();
+            const idActual = document.getElementById('producto_id').value; // Por si estamos editando
+            
+            // 1. VALIDACIÓN ANTIDUPLICADOS IMPLACABLE
+            const duplicado = productosExistentes.find(p => p.codigo === codigoEscaneado && p.codigo !== "");
+            
+            if (duplicado && duplicado.id != idActual) {
+                alert(`⚠️ ALTO: Este código ya pertenece a [${duplicado.nombre}].\n\nSi le llegó más mercadería de esto, cierre esta ventana y use el botón verde "➕ Ingresar" en la tabla.`);
+                this.value = ''; // Borramos el código repetido
+                return; // Frenamos todo aquí
+            }
+
+            // 2. Si el código es nuevo, saltamos al nombre a la velocidad de la luz
+            document.getElementById('nombre').focus();
         }
     });
 
@@ -276,17 +295,16 @@
         document.getElementById('seccion_primer_lote').style.display = 'block'; 
         formProducto.reset();
         
-        // Magia de UI: Ponemos el cursor en el código de barras después de medio segundo (cuando termina la animación del modal)
         setTimeout(() => document.getElementById('codigo_barras').focus(), 500);
-        
         modalProductoObj.show();
     };
 
-    window.abrirModalEditar = function(id, nombre, id_cat, u_blister, u_caja, p_uni, p_blister, p_caja, codigo) {
+    window.abrirModalEditar = function(id, nombre, u_blister, u_caja, p_uni, p_blister, p_caja, codigo) {
         document.getElementById('tituloModalProducto').innerText = "Editar Catálogo del Producto";
         document.getElementById('producto_id').value = id;
         document.getElementById('codigo_barras').value = codigo || "";
         document.getElementById('nombre').value = nombre;
+        
         document.getElementById('unidades_por_blister').value = u_blister;
         document.getElementById('unidades_por_caja').value = u_caja;
         document.getElementById('precio_caja').value = p_caja;
@@ -304,7 +322,7 @@
         const url = id_producto ? `/productos/${id_producto}` : '/productos/';
 
         const productoData = {
-            id_categoria: 1,
+            id_categoria: 1, // Categoría por defecto oculta
             codigo_barras: document.getElementById('codigo_barras').value || null, 
             nombre: document.getElementById('nombre').value,
             unidades_por_blister: parseInt(document.getElementById('unidades_por_blister').value),
@@ -331,7 +349,7 @@
         }
     });
 
-    // --- LÓGICA PARA INHABILITAR (Soft Delete) ---
+    // --- LÓGICA PARA INHABILITAR Y RESTAURAR ---
     window.inhabilitarProducto = async function(id) {
         if(confirm("¿Estás seguro de inhabilitar este producto?")) {
             await fetch(`/productos/${id}`, { method: 'DELETE' });
@@ -339,37 +357,11 @@
         }
     };
 
-    window.inhabilitarCategoria = async function(id) {
-        if(confirm("¿Seguro de inhabilitar esta categoría?")) {
-            await fetch(`/categorias/${id}`, { method: 'DELETE' });
-            window.location.reload();
-        }
-    };
-
-    // Funciones para Restaurar (Habilitar)
     window.habilitarProducto = async function(id) {
         if(confirm("¿Deseas volver a habilitar este producto para la venta?")) {
             await fetch(`/productos/${id}/habilitar`, { method: 'PUT' });
             window.location.reload();
         }
     };
-
-    window.habilitarCategoria = async function(id) {
-        if(confirm("¿Deseas volver a habilitar esta categoría?")) {
-            await fetch(`/categorias/${id}/habilitar`, { method: 'PUT' });
-            window.location.reload();
-        }
-    };
-
-    document.getElementById('formCategoria').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nombreCat = document.getElementById('nombre_categoria').value;
-        const response = await fetch('/categorias/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre: nombreCat })
-        });
-        if (response.ok) window.location.reload();
-    });
 </script>
 {% endblock %}

@@ -71,8 +71,8 @@ def poblar_datos():
         productos_db.append(prod)
 
     # 4. SIMULAR LAS VENTAS
-    fecha_inicio = datetime(2026, 1, 1)
-    fecha_fin = datetime(2026, 3, 10)
+    fecha_inicio = datetime(2025, 1, 1)
+    fecha_fin = datetime(2026, 3, 12)
     dias_totales = (fecha_fin - fecha_inicio).days
     
     ventas_creadas = 0

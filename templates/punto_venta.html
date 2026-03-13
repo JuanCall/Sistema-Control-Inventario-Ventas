@@ -89,12 +89,23 @@
                     <span id="total_venta">S/ 0.00</span>
                 </div>
 
-                <div class="mb-4">
+                <div class="mb-3">
                     <label class="form-label text-muted small fw-bold">Método de Pago</label>
-                    <select id="metodo_pago" class="form-select border-primary bg-white fw-bold">
+                    <select id="metodo_pago" class="form-select border-primary bg-white fw-bold" onchange="toggleVuelto()">
                         <option value="Efectivo">💵 Efectivo (Caja)</option>
                         <option value="Yape">📱 Yape / Plin</option>
                     </select>
+                </div>
+
+                <div id="seccion_vuelto" class="mb-4">
+                    <div class="mb-2">
+                        <label class="form-label text-muted small fw-bold">Paga con (S/)</label>
+                        <input type="number" id="paga_con" class="form-control form-control-lg border-success fw-bold text-center" placeholder="Ej. 50" step="0.10">
+                    </div>
+                    <div class="p-2 bg-white border rounded shadow-sm text-center mb-3">
+                        <small class="fw-bold text-muted">Vuelto a entregar</small><br>
+                        <span id="ui_vuelto" class="fs-4 fw-bold text-danger">S/ 0.00</span>
+                    </div>
                 </div>
 
                 <button class="btn btn-primary w-100 btn-lg" id="btn_cobrar" disabled>Cobrar e Imprimir</button>
@@ -139,8 +150,7 @@
     const filtroCaja = document.getElementById('filtro_fecha_caja');
 
     if (filtroCaja) {
-        // Poner la fecha de hoy por defecto
-        filtroCaja.value = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+        filtroCaja.value = new Date().toLocaleDateString('en-CA'); 
         
         function calcularCajaDia() {
             let ef = 0, yp = 0;
@@ -155,7 +165,7 @@
         }
 
         filtroCaja.addEventListener('change', calcularCajaDia);
-        calcularCajaDia(); // Calcular al cargar la página
+        calcularCajaDia(); 
     }
 
     let productoActual = {}; 
@@ -164,11 +174,43 @@
     const totalUI = document.getElementById('total_venta');
     const btnCobrar = document.getElementById('btn_cobrar');
     const buscador = document.getElementById('buscador');
-    
     const modalVenta = new bootstrap.Modal(document.getElementById('modalOpcionesVenta'));
     const formAgregar = document.getElementById('formAgregarCarrito');
     const selectTipoVenta = document.getElementById('tipo_venta');
     const labelPrecioDinamico = document.getElementById('precio_dinamico');
+
+    // === LÓGICA DE VUELTO ===
+    const pagaConInput = document.getElementById('paga_con');
+    const uiVuelto = document.getElementById('ui_vuelto');
+    const seccionVuelto = document.getElementById('seccion_vuelto');
+
+    window.toggleVuelto = function() {
+        const metodo = document.getElementById('metodo_pago').value;
+        if (metodo === 'Yape') {
+            seccionVuelto.style.display = 'none';
+            pagaConInput.value = '';
+            uiVuelto.innerText = 'S/ 0.00';
+            uiVuelto.className = "fs-4 fw-bold text-danger";
+        } else {
+            seccionVuelto.style.display = 'block';
+            pagaConInput.focus();
+        }
+    }
+
+    pagaConInput.addEventListener('input', function() {
+        const totalText = totalUI.innerText.replace('S/ ', '');
+        const total = parseFloat(totalText) || 0;
+        const pago = parseFloat(this.value) || 0;
+        const vuelto = pago - total;
+        
+        if (vuelto >= 0 && this.value !== "") {
+            uiVuelto.innerText = `S/ ${vuelto.toFixed(2)}`;
+            uiVuelto.className = "fs-4 fw-bold text-success";
+        } else {
+            uiVuelto.innerText = `S/ 0.00`;
+            uiVuelto.className = "fs-4 fw-bold text-danger";
+        }
+    });
 
     // === BUSCADOR Y LECTOR DE CÓDIGO DE BARRAS ===
     buscador.addEventListener('keyup', function(e) {
@@ -272,6 +314,10 @@
         }
         actualizarTicket();
         modalVenta.hide(); 
+        
+        // Disparar evento de input en paga_con por si ya había escrito algo
+        if(pagaConInput) pagaConInput.dispatchEvent(new Event('input'));
+        
         setTimeout(() => buscador.focus(), 500);
     });
 
@@ -282,6 +328,7 @@
             carritoUI.innerHTML = '<li class="list-group-item text-center text-muted">Aún no hay productos en la venta</li>';
             btnCobrar.disabled = true;
             totalUI.innerText = 'S/ 0.00';
+            if(pagaConInput) pagaConInput.dispatchEvent(new Event('input'));
             return;
         }
         carrito.forEach((item, index) => {
@@ -301,6 +348,7 @@
         });
         totalUI.innerText = `S/ ${total.toFixed(2)}`;
         btnCobrar.disabled = false;
+        if(pagaConInput) pagaConInput.dispatchEvent(new Event('input'));
     }
 
     window.eliminarItem = function(index) {
@@ -308,7 +356,7 @@
         actualizarTicket();
     };
 
-    // === NUEVA FUNCIÓN: IMPRIMIR TICKET TÉRMICO ===
+    // === FUNCION PARA IMPRIMIR TICKET TÉRMICO ===
     function imprimirTicket(carritoDatos, total, metodo) {
         const fecha = new Date().toLocaleString('es-PE');
         let ventana = window.open('', 'Imprimir Ticket', 'width=400,height=600');
@@ -316,7 +364,8 @@
         let html = `
         <html><head>
         <style>
-            body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 10px; width: 58mm; color: #000; }
+            @page { margin: 0; size: 58mm auto; }
+            body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 2mm; width: 58mm; color: #000; }
             h3 { text-align: center; margin: 0 0 5px 0; font-size: 15px; }
             .centro { text-align: center; }
             .derecha { text-align: right; }
@@ -326,7 +375,7 @@
             .total { font-weight: bold; font-size: 14px; margin-top: 5px; }
         </style>
         </head><body>
-            <h3>BOTICA -----</h3>
+            <h3>BOTICA + SALUD</h3>
             <div class="centro">Máncora - Piura<br>Ticket de Venta<br>${fecha}</div>
             <div class="linea"></div>
             <table>
@@ -342,6 +391,19 @@
             <div class="linea"></div>
             <div class="derecha total">TOTAL: S/ ${total.toFixed(2)}</div>
             <div class="derecha">Pago con: <b>${metodo}</b></div>
+        `;
+
+        // === INCLUIR VUELTO EN TICKET SI ES EFECTIVO ===
+        if (metodo === 'Efectivo') {
+            const pagoCon = parseFloat(document.getElementById('paga_con').value) || total;
+            const vueltoEntregado = pagoCon - total;
+            html += `
+            <div class="derecha">Recibido: S/ ${pagoCon.toFixed(2)}</div>
+            <div class="derecha">Vuelto: S/ ${vueltoEntregado.toFixed(2)}</div>
+            `;
+        }
+        
+        html += `
             <div class="linea"></div>
             <div class="centro"><br>¡Gracias por su preferencia!<br>Vuelva pronto</div>
         </body></html>
@@ -369,7 +431,7 @@
         const payload = {
             id_usuario: 1, 
             detalles: detallesUnificados,
-            metodo_pago: metodoSeleccionado // <-- Enviamos el método de pago
+            metodo_pago: metodoSeleccionado 
         };
 
         const response = await fetch('/ventas/', {
@@ -379,7 +441,6 @@
         });
 
         if (response.ok) {
-            // Imprimimos el ticket antes de recargar
             imprimirTicket(carrito, totalVenta, metodoSeleccionado);
             alert('¡Venta registrada exitosamente!');
             window.location.reload(); 

@@ -25,6 +25,7 @@ class CategoriaResponse(CategoriaCreate):
 # Esquema para crear un Producto + su primer Lote
 class ProductoCreate(BaseModel):
     id_categoria: int
+    codigo_barras: Optional[str] = None
     nombre: str
     cantidad_cajas_inicial: int # Para el primer lote
     unidades_por_blister: int
@@ -104,11 +105,16 @@ def registrar_nuevo_lote(lote: LoteCreate, db: Session = Depends(get_db)):
     
     return {"mensaje": "Nuevo lote de mercadería registrado con éxito"}
 
+# ==========================================
+# RUTAS DE PRODUCTOS
+# ==========================================
+
 @router.post("/productos/", tags=["Productos"])
 def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
     # 1. Creamos el catálogo base (sin stock)
     nuevo_producto = models.Producto(
         id_categoria=producto.id_categoria,
+        codigo_barras=producto.codigo_barras,
         nombre=producto.nombre,
         unidades_por_blister=producto.unidades_por_blister,
         unidades_por_caja=producto.unidades_por_caja,
@@ -135,9 +141,10 @@ def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
 
 @router.put("/productos/{id_producto}", tags=["Productos"])
 def actualizar_producto(id_producto: int, producto: ProductoCreate, db: Session = Depends(get_db)):
-    # V2: Editar un producto solo actualiza sus nombres y precios de venta.
+    # Editar un producto solo actualiza sus nombres y precios de venta.
     db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
     db_producto.id_categoria = producto.id_categoria
+    db_producto.codigo_barras = producto.codigo_barras
     db_producto.nombre = producto.nombre
     db_producto.unidades_por_blister = producto.unidades_por_blister
     db_producto.unidades_por_caja = producto.unidades_por_caja
@@ -165,7 +172,7 @@ def habilitar_producto(id_producto: int, db: Session = Depends(get_db)):
 @router.post("/ventas/", tags=["Ventas"])
 def registrar_venta(venta: VentaCreate, db: Session = Depends(get_db)):
     total_venta = 0
-    # NUEVO: Guardamos el método de pago en la base de datos
+    # Guardamos el método de pago en la base de datos
     nueva_venta = models.Venta(
         id_usuario=venta.id_usuario, 
         total_venta=0, 

@@ -1,7 +1,11 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Date, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.database import Base
+
+# Función para obtener siempre la hora exacta de Perú (UTC -5)
+def hora_peru():
+    return datetime.utcnow() - timedelta(hours=5)
 
 # ==========================================
 # TABLA USUARIOS
@@ -85,7 +89,7 @@ class Venta(Base):
 
     id_venta = Column(Integer, primary_key=True, index=True, autoincrement=True)
     id_usuario = Column(Integer, ForeignKey("Usuarios.id_usuario"))
-    fecha_hora = Column(DateTime, default=datetime.utcnow)
+    fecha_hora = Column(DateTime, default=hora_peru)
     total_venta = Column(Float, nullable=False)
     metodo_pago = Column(String, default="Efectivo")
 
