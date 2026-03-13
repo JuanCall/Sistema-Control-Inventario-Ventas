@@ -1,4 +1,4 @@
-# SystemSmart - Gestión de Inventario y Ventas (Edición Farmacia) 💊
+# SistemaSmart - Gestión de Inventario y Ventas (Edición Farmacia) 💊
 
 **SistemaSmart** es una solución integral de punto de venta (POS) e inventario diseñada específicamente para pequeñas y medianas boticas y farmacias en Perú. El sistema permite un control riguroso de la mercadería, optimizando la rentabilidad mediante el seguimiento inteligente de lotes, integración de hardware estándar y control exacto de flujos de efectivo y billeteras digitales.
 
