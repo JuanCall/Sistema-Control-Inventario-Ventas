@@ -53,9 +53,14 @@
                                 <button class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
                                 
                                 <button class="btn btn-sm btn-warning me-1" onclick="abrirModalEditar(
-                                    {{ producto.id_producto }}, '{{ producto.nombre }}', {{ producto.id_categoria }},
-                                    {{ producto.unidades_por_blister }}, {{ producto.unidades_por_caja }},
-                                    {{ producto.precio_unidad }}, {{ producto.precio_blister or 0 }}, {{ producto.precio_caja or 0 }},
+                                    {{ producto.id_producto }}, 
+                                    '{{ producto.nombre }}',
+                                    {{ producto.id_categoria }},
+                                    {{ producto.unidades_por_blister }}, 
+                                    {{ producto.unidades_por_caja }},
+                                    {{ producto.precio_unidad }}, 
+                                    {{ producto.precio_blister or 0 }}, 
+                                    {{ producto.precio_caja or 0 }},
                                     '{{ producto.codigo_barras or '' }}' 
                                 )">✏️</button>
                                 <button class="btn btn-sm btn-danger" onclick="inhabilitarProducto({{ producto.id_producto }})">🗑️</button>
@@ -299,7 +304,7 @@
         modalProductoObj.show();
     };
 
-    window.abrirModalEditar = function(id, nombre, u_blister, u_caja, p_uni, p_blister, p_caja, codigo) {
+    window.abrirModalEditar = function(id, nombre, id_categoria, u_blister, u_caja, p_uni, p_blister, p_caja, codigo) {
         document.getElementById('tituloModalProducto').innerText = "Editar Catálogo del Producto";
         document.getElementById('producto_id').value = id;
         document.getElementById('codigo_barras').value = codigo || "";
