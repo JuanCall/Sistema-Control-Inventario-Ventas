@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from typing import List, Optional
 from app.database import SessionLocal
@@ -123,7 +124,13 @@ def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
         precio_caja=producto.precio_caja
     )
     db.add(nuevo_producto)
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback() # Deshacemos el intento fallido para que no se trabe la base de datos
+        raise HTTPException(status_code=400, detail="El código de barras ingresado ya le pertenece a otro producto.")
+    
     db.refresh(nuevo_producto)
 
     # 2. Creamos su PRIMER LOTE con las cantidades y fechas

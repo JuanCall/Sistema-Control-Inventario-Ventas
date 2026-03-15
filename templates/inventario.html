@@ -9,8 +9,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Gestión de Inventario (Farmacia)</h2>
-    <div>
-        <button class="btn btn-primary" onclick="abrirModalCrear()">+ Nuevo Producto</button>
+    <div class="d-flex gap-2 w-50">
+        <input type="text" id="buscador_maestro" class="form-control border-primary border-2 shadow-sm" placeholder="🔫 Pistolee aquí para ingresar o registrar..." autofocus>
+        <button class="btn btn-primary text-nowrap" onclick="abrirModalCrear()">+ Nuevo Producto</button>
     </div>
 </div>
 
@@ -50,7 +51,7 @@
                         <td>
                             {% if producto.activo %}
                                 <button class="btn btn-sm btn-outline-info me-1" data-bs-toggle="collapse" data-bs-target="#lotes-{{ producto.id_producto }}">📦 Lotes</button>
-                                <button class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
+                                <button id="btn_ingresar_{{ producto.id_producto }}" class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
                                 
                                 <button class="btn btn-sm btn-warning me-1" onclick="abrirModalEditar(
                                     {{ producto.id_producto }}, 
@@ -242,23 +243,68 @@
     const formProducto = document.getElementById('formProducto');
     const formNuevoLote = document.getElementById('formNuevoLote');
 
-    // --- LÓGICA DEL LECTOR DE CÓDIGO DE BARRAS (100% OFFLINE + ANTIDUPLICADOS) ---
+    // --- LÓGICA DEL BUSCADOR MAESTRO (EL CEREBRO DE LA OPERACIÓN) ---
+    const buscadorMaestro = document.getElementById('buscador_maestro');
+    
+    if (buscadorMaestro) {
+        buscadorMaestro.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const codigoEscaneado = this.value.trim();
+                if (codigoEscaneado === '') return;
+
+                // Buscamos si el código ya existe en la memoria
+                const productoEncontrado = productosExistentes.find(p => p.codigo === codigoEscaneado);
+
+                if (productoEncontrado) {
+                    // ¡EXISTE! Le abrimos la ventana para ingresar el nuevo lote directamente
+                    abrirModalComprar(productoEncontrado.id, productoEncontrado.nombre);
+                } else {
+                    // ¡NO EXISTE! Le abrimos la ventana de crear producto
+                    abrirModalCrear();
+                    
+                    // Magia: Le pre-llenamos el código de barras para que no lo escanee de nuevo
+                    setTimeout(() => {
+                        const inputCodigo = document.getElementById('codigo_barras');
+                        inputCodigo.value = codigoEscaneado;
+                        
+                        // Resaltamos el input de nombre para que empiece a tipear
+                        document.getElementById('nombre').focus();
+                    }, 500);
+                }
+                
+                // Limpiamos el buscador maestro para el siguiente producto
+                this.value = '';
+            }
+        });
+    }
+    
+    // --- LÓGICA DEL LECTOR DE CÓDIGO DE BARRAS (AUTOMATIZADO) ---
     document.getElementById('codigo_barras').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault(); 
             const codigoEscaneado = this.value.trim();
-            const idActual = document.getElementById('producto_id').value; // Por si estamos editando
+            const idActual = document.getElementById('producto_id').value; 
             
-            // 1. VALIDACIÓN ANTIDUPLICADOS IMPLACABLE
             const duplicado = productosExistentes.find(p => p.codigo === codigoEscaneado && p.codigo !== "");
             
             if (duplicado && duplicado.id != idActual) {
-                alert(`⚠️ ALTO: Este código ya pertenece a [${duplicado.nombre}].\n\nSi le llegó más mercadería de esto, cierre esta ventana y use el botón verde "➕ Ingresar" en la tabla.`);
-                this.value = ''; // Borramos el código repetido
-                return; // Frenamos todo aquí
+                // 1. Ocultamos la ventana actual de "Crear Producto"
+                modalProductoObj.hide();
+                this.value = ''; // Limpiamos el input
+                
+                // 2. Simulamos el clic en el botón de "Ingresar" de ese producto
+                setTimeout(() => {
+                    const btnIngreso = document.getElementById(`btn_ingresar_${duplicado.id}`);
+                    if (btnIngreso) {
+                        btnIngreso.click();
+                    } else {
+                        alert(`El producto [${duplicado.nombre}] ya está registrado. Búsquelo en la tabla para sumarle stock.`);
+                    }
+                }, 400); 
+                
+                return; 
             }
-
-            // 2. Si el código es nuevo, saltamos al nombre a la velocidad de la luz
             document.getElementById('nombre').focus();
         }
     });
@@ -267,38 +313,46 @@
     window.abrirModalComprar = function(id_producto, nombre_producto) {
         document.getElementById('lote_id_producto').value = id_producto;
         document.getElementById('nombre_producto_lote').innerText = nombre_producto;
+        
+        // Asignamos una función anónima limpia al evento submit del formulario de lotes
+        formNuevoLote.onsubmit = async function(e) {
+            e.preventDefault();
+            const payload = {
+                id_producto: parseInt(document.getElementById('lote_id_producto').value),
+                cantidad_cajas: parseInt(document.getElementById('lote_cajas').value),
+                precio_costo_caja: parseFloat(document.getElementById('lote_costo').value),
+                fecha_vencimiento: document.getElementById('lote_vencimiento').value
+            };
+
+            const response = await fetch('/lotes/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert("Error al registrar el lote.");
+            }
+        };
         formNuevoLote.reset();
         modalLoteObj.show();
     };
-
-    formNuevoLote.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const payload = {
-            id_producto: parseInt(document.getElementById('lote_id_producto').value),
-            cantidad_cajas: parseInt(document.getElementById('lote_cajas').value),
-            precio_costo_caja: parseFloat(document.getElementById('lote_costo').value),
-            fecha_vencimiento: document.getElementById('lote_vencimiento').value
-        };
-
-        const response = await fetch('/lotes/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            alert("Error al registrar el lote.");
-        }
-    });
 
     // --- LÓGICA DE PRODUCTOS (Crear / Editar V2) ---
     window.abrirModalCrear = function() {
         document.getElementById('tituloModalProducto').innerText = "Registrar Nuevo Producto";
         document.getElementById('producto_id').value = "";
         document.getElementById('seccion_primer_lote').style.display = 'block'; 
-        formProducto.reset();
+        
+        // Limpiamos los inputs obligatorios
+        document.getElementById('nombre').value = "";
+        document.getElementById('codigo_barras').value = "";
+        document.getElementById('precio_unidad').value = "";
+        document.getElementById('cantidad_cajas_inicial').value = "";
+        document.getElementById('precio_costo_caja').value = "";
+        document.getElementById('fecha_vencimiento').value = "";
         
         setTimeout(() => document.getElementById('codigo_barras').focus(), 500);
         modalProductoObj.show();
