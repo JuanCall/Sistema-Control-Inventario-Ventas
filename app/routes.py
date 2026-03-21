@@ -15,6 +15,10 @@ def get_db():
         yield db
     finally:
         db.close()
+#AJUSTE DE LOTE TEMPORAL
+class AjusteLote(BaseModel):
+    stock_unidades: int
+    precio_costo_caja: float
 
 class CategoriaCreate(BaseModel):
     nombre: str
@@ -230,3 +234,24 @@ def registrar_venta(venta: VentaCreate, db: Session = Depends(get_db)):
     nueva_venta.total_venta = total_venta
     db.commit()
     return {"mensaje": "Venta exitosa", "total": total_venta}
+
+# --- RUTA PARA AUDITORÍA / AJUSTE DE LOTES ---
+@router.put("/lotes/{id_lote}/ajuste", tags=["Lotes"])
+def ajustar_lote(id_lote: int, ajuste: AjusteLote, db: Session = Depends(get_db)):
+    lote = db.query(models.Lote).filter(models.Lote.id_lote == id_lote).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    
+    # 1. Ajustamos el lote específico
+    lote.stock_unidades = ajuste.stock_unidades
+    lote.precio_costo_caja = ajuste.precio_costo_caja
+    db.commit()
+    
+    # 2. Recalculamos el stock total del producto sumando todos sus lotes activos
+    producto = db.query(models.Producto).filter(models.Producto.id_producto == lote.id_producto).first()
+    if producto:
+        total_stock = sum(l.stock_unidades for l in producto.lotes if l.activo)
+        producto.stock_actual = total_stock
+        db.commit()
+        
+    return {"mensaje": "Inventario regularizado correctamente"}

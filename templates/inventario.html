@@ -79,7 +79,16 @@
                                 {% for lote in producto.lotes if lote.activo %}
                                 <li class="list-group-item bg-white border-info flex-fill">
                                     <div class="d-flex justify-content-between">
+                                        
+                                        <!-- Comentado temporal para ajuste de lote
                                         <small class="fw-bold">Quedan: {{ lote.stock_unidades }} unid.</small>
+                                        -->
+                                    <!-- AJUSTE DE LOTE-->
+                                        <div>
+                                            <small class="fw-bold me-2">Quedan: {{ lote.stock_unidades }} unid.</small>
+                                            <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="abrirModalAjusteLote({{ lote.id_lote }}, {{ lote.stock_unidades }}, {{ lote.precio_costo_caja }}, {{ producto.unidades_por_caja }})">✏️ Ajustar Stock</button>
+                                        </div>
+                                    <!-- ---------------- -->
                                         <small class="text-danger">Vence: {{ lote.fecha_vencimiento }}</small>
                                     </div>
                                     <small class="text-muted">Costo Caja: S/ {{ "%.2f"|format(lote.precio_costo_caja) }}</small>
@@ -227,10 +236,106 @@
         </div>
     </div>
 </div>
+
+<!--MODAL AJUSTE DE LOTE-->
+<div class="modal fade" id="modalAjusteLote" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-primary">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Auditoría de Lote</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formAjusteLote">
+                    <input type="hidden" id="ajuste_id_lote">
+                    
+                    <div class="p-2 bg-light border rounded mb-3">
+                        <label class="form-label fw-bold text-muted small mb-1">¿Qué hay en el estante? (Caja = <span id="lbl_u_caja" class="text-danger"></span> unid.)</label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <input type="number" class="form-control text-center" id="ajuste_cajas" placeholder="Cajas">
+                                <small class="text-muted" style="font-size: 0.7rem;">Cajas cerradas</small>
+                            </div>
+                            <div class="col-6">
+                                <input type="number" class="form-control text-center" id="ajuste_sueltas" placeholder="Sueltas">
+                                <small class="text-muted" style="font-size: 0.7rem;">Unid. sueltas</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-primary">Total Unidades Reales</label>
+                        <input type="number" class="form-control form-control-lg border-primary fw-bold" id="ajuste_unidades" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-danger">Costo Real x Caja (S/)</label>
+                        <input type="number" step="0.01" class="form-control" id="ajuste_costo" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar Corrección</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+
+    // --- LÓGICA DE AJUSTE RÁPIDO Y CALCULADORA ---
+    const modalAjusteObj = new bootstrap.Modal(document.getElementById('modalAjusteLote'));
+    let uPorCajaActual = 1; // Guardará el tamaño de la caja del producto que estamos editando
+    
+    window.abrirModalAjusteLote = function(id_lote, unidades_actuales, costo_actual, u_caja) {
+        document.getElementById('ajuste_id_lote').value = id_lote;
+        document.getElementById('ajuste_unidades').value = unidades_actuales;
+        document.getElementById('ajuste_costo').value = costo_actual || 0;
+        
+        // Configuramos la calculadora
+        uPorCajaActual = u_caja;
+        document.getElementById('lbl_u_caja').innerText = u_caja;
+        
+        // Matemática inversa: Adivinamos cuántas cajas y sueltas tiene actualmente
+        document.getElementById('ajuste_cajas').value = Math.floor(unidades_actuales / u_caja);
+        document.getElementById('ajuste_sueltas').value = unidades_actuales % u_caja;
+
+        modalAjusteObj.show();
+    };
+
+    // Escuchamos cuando tipeen cajas o sueltas para sumar automáticamente
+    document.getElementById('ajuste_cajas').addEventListener('input', calcularTotalAjuste);
+    document.getElementById('ajuste_sueltas').addEventListener('input', calcularTotalAjuste);
+
+    function calcularTotalAjuste() {
+        const cajas = parseInt(document.getElementById('ajuste_cajas').value) || 0;
+        const sueltas = parseInt(document.getElementById('ajuste_sueltas').value) || 0;
+        // Multiplicamos las cajas por su capacidad, y le sumamos las sueltas
+        document.getElementById('ajuste_unidades').value = (cajas * uPorCajaActual) + sueltas;
+    }
+
+    // El guardado sigue siendo igual de seguro
+    document.getElementById('formAjusteLote').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id_lote = document.getElementById('ajuste_id_lote').value;
+        const payload = {
+            stock_unidades: parseInt(document.getElementById('ajuste_unidades').value),
+            precio_costo_caja: parseFloat(document.getElementById('ajuste_costo').value)
+        };
+
+        const response = await fetch(`/lotes/${id_lote}/ajuste`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert("Error al ajustar el inventario.");
+        }
+    });
+    //-------------------------------------------------
+
     // 1. CARGAMOS LA MEMORIA DE PRODUCTOS PARA EVITAR DUPLICADOS
     const productosExistentes = [
         {% for p in productos %}
