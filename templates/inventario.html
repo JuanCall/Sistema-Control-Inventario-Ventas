@@ -12,6 +12,7 @@
     <div class="d-flex gap-2 w-50">
         <input type="text" id="buscador_maestro" class="form-control border-primary border-2 shadow-sm" placeholder="🔫 Pistolee aquí para ingresar o registrar..." autofocus>
         <button class="btn btn-primary text-nowrap" onclick="abrirModalCrear()">+ Nuevo Producto</button>
+        <button class="btn btn-outline-secondary text-nowrap" onclick="reiniciarAuditoria()" title="Limpiar los checks de revisión">🔄 Reiniciar Checks</button>
     </div>
 </div>
 
@@ -50,6 +51,7 @@
                         </td>
                         <td>
                             {% if producto.activo %}
+                                <button id="btn_check_{{ producto.id_producto }}" class="btn btn-sm btn-outline-success me-1" onclick="marcarRevisado({{ producto.id_producto }})" title="Marcar como auditado">✔️</button>
                                 <button class="btn btn-sm btn-outline-info me-1" data-bs-toggle="collapse" data-bs-target="#lotes-{{ producto.id_producto }}">📦 Lotes</button>
                                 <button id="btn_ingresar_{{ producto.id_producto }}" class="btn btn-sm btn-success me-1" onclick="abrirModalComprar({{ producto.id_producto }}, '{{ producto.nombre }}')">➕ Ingresar</button>
                                 
@@ -352,6 +354,7 @@
     const buscadorMaestro = document.getElementById('buscador_maestro');
     
     if (buscadorMaestro) {
+        // 1. LÓGICA DE LA PISTOLA (Salta al presionar ENTER)
         buscadorMaestro.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -380,7 +383,22 @@
                 
                 // Limpiamos el buscador maestro para el siguiente producto
                 this.value = '';
+                
+                // Restablecemos la tabla por si estaba filtrada
+                document.querySelectorAll('tbody tr:not(.collapse)').forEach(fila => {
+                    fila.style.display = '';
+                });
             }
+        });
+
+        // 2. LÓGICA DE FILTRADO POR TEXTO (Filtra en tiempo real al escribir)
+        buscadorMaestro.addEventListener('input', function() {
+            const filtro = this.value.toLowerCase();
+            // Buscamos solo las filas principales, ignorando las filas de lotes desplegables
+            document.querySelectorAll('tbody tr:not(.collapse)').forEach(fila => {
+                const textoFila = fila.innerText.toLowerCase();
+                fila.style.display = textoFila.includes(filtro) ? '' : 'none';
+            });
         });
     }
     
@@ -527,5 +545,43 @@
             window.location.reload();
         }
     };
+
+    // --- LÓGICA DE AUDITORÍA Y CHECKS ---
+    // 1. Cargamos la memoria del navegador
+    let auditados = JSON.parse(localStorage.getItem('auditoria_farmacia')) || [];
+
+    // 2. Función para ocultar los botones de los que ya revisamos
+    function aplicarEstilosAuditoria() {
+        auditados.forEach(id => {
+            const btn = document.getElementById(`btn_check_${id}`);
+            if (btn) {
+                btn.style.display = 'none'; // Desaparece el botón
+                btn.closest('tr').classList.replace('table-secondary', 'table-success'); // Opcional: la fila se pinta levemente de verde
+                if (!btn.closest('tr').classList.contains('table-success')) {
+                    btn.closest('tr').classList.add('table-success');
+                }
+            }
+        });
+    }
+
+    // 3. Acción al hacer clic en el ✔️
+    window.marcarRevisado = function(id) {
+        if (!auditados.includes(id)) {
+            auditados.push(id);
+            localStorage.setItem('auditoria_farmacia', JSON.stringify(auditados)); // Guardamos en memoria
+            aplicarEstilosAuditoria();
+        }
+    };
+
+    // 4. Botón para reiniciar todo cuando terminen el inventario
+    window.reiniciarAuditoria = function() {
+        if(confirm("¿Estás seguro de reiniciar los checks? Todos los productos volverán a aparecer como no revisados.")) {
+            localStorage.removeItem('auditoria_farmacia');
+            window.location.reload();
+        }
+    };
+
+    // Ejecutamos la revisión visual apenas carga la página
+    aplicarEstilosAuditoria();
 </script>
 {% endblock %}

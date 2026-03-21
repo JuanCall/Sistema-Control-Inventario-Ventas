@@ -32,7 +32,7 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # --- FUNCIÓN PUENTE ---
 def preparar_productos_para_html(db: Session):
-    productos = db.query(models.Producto).all()
+    productos = db.query(models.Producto).order_by(models.Producto.nombre.asc()).all()
     for p in productos:
         lotes_activos = [l for l in p.lotes if l.activo]
         p.stock_actual = sum(l.stock_unidades for l in lotes_activos)
